@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>3. 登入流程 — OAuth2（Authorization Code Flow）</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:0;font-size:14px}
+
+.page{max-width:1200px;margin:0 auto;padding:36px 40px 48px}
+.title{font-size:20px;font-weight:700;margin-bottom:4px;color:#1a1a1a}
+.title-line{height:3px;background:linear-gradient(90deg,#4a7fd4 0%,#4a7fd4 40%,#e5e5e5 40%);margin-bottom:28px;border-radius:2px}
+
+svg{display:block;margin:0 auto}
+svg text{font-family:'Noto Sans TC',sans-serif}
+
+.participant-box{fill:#f0f4fa;stroke:#b0c4de;stroke-width:1.5;rx:6}
+.participant-label{font-size:13px;font-weight:600;fill:#2c3e6b;text-anchor:middle;dominant-baseline:central}
+.lifeline{stroke:#d0d0d0;stroke-width:1;stroke-dasharray:6,4}
+.arrow-solid{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#arrowhead)}
+.arrow-dash{stroke:#888;stroke-width:1.2;fill:none;stroke-dasharray:6,4;marker-end:url(#arrowhead-light)}
+.msg-label{font-size:12px;fill:#333}
+.msg-label-bold{font-size:12px;fill:#1a1a1a;font-weight:600}
+.msg-sub{font-size:10.5px;fill:#888}
+.msg-code{font-size:11.5px;fill:#c0392b;font-family:'Source Code Pro',monospace}
+.msg-error{font-size:11.5px;fill:#c0392b;font-weight:500}
+.msg-success{font-size:11.5px;fill:#1a7a3a;font-weight:500}
+.msg-redirect{font-size:11.5px;fill:#b07d2e;font-weight:500}
+.activation{fill:#e8eefc;stroke:#b0c4de;stroke-width:1;rx:2}
+.activation-db{fill:#f0e8fc;stroke:#c4b0de;stroke-width:1;rx:2}
+.activation-idp{fill:#fef3e2;stroke:#deb87a;stroke-width:1;rx:2}
+.frame{fill:none;stroke:#bbb;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-label-bg{fill:#f5f5f5;stroke:none}
+.frame-label{font-size:10px;fill:#888;font-weight:600;letter-spacing:0.5px}
+.frame-jit{fill:rgba(240,232,252,0.15);stroke:#c4b0de;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-jit-label-bg{fill:#f3eefa;stroke:none}
+.frame-jit-label{font-size:10px;fill:#7c5cad;font-weight:600;letter-spacing:0.5px}
+.phase-line{stroke:#ccc;stroke-width:1;stroke-dasharray:2,2}
+.phase-bg{fill:#f9fafb;stroke:none}
+.phase-label{font-size:10px;fill:#999;font-weight:600;text-anchor:middle;letter-spacing:1px}
+.note-box{fill:#fffde7;stroke:#e0d97e;stroke-width:1;rx:4}
+.note-text{font-size:10.5px;fill:#6b6320}
+.note-box-blue{fill:#eef4ff;stroke:#a8c4e8;stroke-width:1;rx:4}
+.note-text-blue{font-size:10.5px;fill:#2c5282}
+.footer{font-size:11px;fill:#bbb;text-anchor:middle;font-family:'Source Code Pro',monospace}
+
+.info{margin-top:20px;padding:14px 16px;border-left:3px solid #4a7fd4;background:#f8fafd;font-size:13px;color:#444;line-height:1.7}
+.info b{color:#1a1a1a}
+.info code{font-family:'Source Code Pro',monospace;font-size:12px;background:#eef2f7;padding:1px 5px;border-radius:3px;color:#c0392b}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">3. 登入流程 — OAuth2（Authorization Code Flow）</div>
+  <div class="title-line"></div>
+
+  <svg width="1140" height="1430" viewBox="0 0 1140 1430">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555"/></marker>
+      <marker id="arrowhead-light" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+      <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/></marker>
+      <marker id="arrowhead-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c0392b"/></marker>
+      <marker id="arrowhead-redirect" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#b07d2e"/></marker>
+    </defs>
+
+    <!-- ==================== PARTICIPANTS (TOP) ==================== -->
+    <rect class="participant-box" x="30" y="10" width="100" height="40"/>
+    <text class="participant-label" x="80" y="30">使用者</text>
+
+    <rect class="participant-box" x="200" y="10" width="120" height="40"/>
+    <text class="participant-label" x="260" y="30">前端 (Browser)</text>
+
+    <rect class="participant-box" x="420" y="10" width="130" height="40"/>
+    <text class="participant-label" x="485" y="30">Auth Service</text>
+
+    <rect class="participant-box" x="670" y="10" width="140" height="40"/>
+    <text class="participant-label" x="740" y="30">External IdP</text>
+
+    <rect class="participant-box" x="920" y="10" width="100" height="40"/>
+    <text class="participant-label" x="970" y="30">資料庫</text>
+
+    <!-- ==================== LIFELINES ==================== -->
+    <line class="lifeline" x1="80" y1="50" x2="80" y2="1330"/>
+    <line class="lifeline" x1="260" y1="50" x2="260" y2="1330"/>
+    <line class="lifeline" x1="485" y1="50" x2="485" y2="1330"/>
+    <line class="lifeline" x1="740" y1="50" x2="740" y2="1330"/>
+    <line class="lifeline" x1="970" y1="50" x2="970" y2="1330"/>
+
+    <!-- ==================== ACTIVATION BOXES ==================== -->
+    <!-- Auth Service: Phase 1 -->
+    <rect class="activation" x="478" y="115" width="14" height="120"/>
+    <!-- Auth Service: Phase 2 -->
+    <rect class="activation" x="478" y="450" width="14" height="690"/>
+    <!-- IdP activations -->
+    <rect class="activation-idp" x="733" y="310" width="14" height="80"/>
+    <rect class="activation-idp" x="733" y="580" width="14" height="36"/>
+    <rect class="activation-idp" x="733" y="660" width="14" height="36"/>
+    <!-- DB activations -->
+    <rect class="activation-db" x="963" y="140" width="14" height="36"/>
+    <rect class="activation-db" x="963" y="770" width="14" height="36"/>
+    <rect class="activation-db" x="963" y="845" width="14" height="36"/>
+    <rect class="activation-db" x="963" y="950" width="14" height="36"/>
+    <rect class="activation-db" x="963" y="1030" width="14" height="36"/>
+    <rect class="activation-db" x="963" y="1100" width="14" height="26"/>
+
+    <!-- ================================================================ -->
+    <!-- PHASE 1: Redirect to IdP                                        -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="72" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="82" x2="1110" y2="82"/>
+    <text class="phase-label" x="570" y="87">Phase 1：導向外部 IdP 授權頁面</text>
+
+    <!-- Step 1: Frontend GET /auth/authorize -->
+    <line class="arrow-solid" x1="260" y1="120" x2="478" y2="120"/>
+    <text class="msg-code" x="290" y="113">GET /auth/authorize?provider=keycloak</text>
+
+    <!-- Step 2: Query IdP config -->
+    <line class="arrow-solid" x1="492" y1="150" x2="963" y2="150"/>
+    <text class="msg-label" x="540" y="145">查詢 IdP 設定 (provider = "keycloak")</text>
+    <line class="arrow-dash" x1="963" y1="170" x2="492" y2="170"/>
+    <text class="msg-sub" x="540" y="185">clientId, authorizeUrl, tokenUrl, redirectUri...</text>
+
+    <!-- Step 3: Generate state + PKCE -->
+    <path d="M492,200 L560,200 L560,222 L492,222" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="500" y="195">產生 state + PKCE code_challenge</text>
+
+    <!-- Step 4: 302 Redirect -->
+    <line x1="478" y1="250" x2="267" y2="250" stroke="#b07d2e" stroke-width="1.5" marker-end="url(#arrowhead-redirect)"/>
+    <text class="msg-redirect" x="280" y="244">302 Redirect</text>
+    <text class="msg-sub" x="280" y="264">→ https://idp.example.com/authorize?client_id=...&redirect_uri=...&state=...&code_challenge=...</text>
+
+    <!-- Step 5: Browser redirects to IdP -->
+    <line x1="260" y1="290" x2="733" y2="290" stroke="#b07d2e" stroke-width="1.5" marker-end="url(#arrowhead-redirect)"/>
+    <text class="msg-redirect" x="370" y="284">Browser 導向 IdP 授權頁面</text>
+
+    <!-- Step 6: User logs in at IdP -->
+    <line x1="733" y1="325" x2="87" y2="325" stroke="#555" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-light)"/>
+    <text class="msg-label" x="250" y="320">顯示 IdP 登入畫面</text>
+
+    <line class="arrow-solid" x1="80" y1="355" x2="733" y2="355"/>
+    <text class="msg-label" x="250" y="349">使用者在 IdP 頁面登入並授權</text>
+
+    <!-- Step 7: IdP redirects back with code -->
+    <line x1="740" y1="390" x2="267" y2="390" stroke="#b07d2e" stroke-width="1.5" marker-end="url(#arrowhead-redirect)"/>
+    <text class="msg-redirect" x="350" y="384">302 Redirect → callback URL</text>
+    <text class="msg-sub" x="350" y="404">/auth/callback?code=abc123&state=xyz</text>
+
+    <!-- ================================================================ -->
+    <!-- PHASE 2: Callback + Token Exchange                               -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="425" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="435" x2="1110" y2="435"/>
+    <text class="phase-label" x="570" y="440">Phase 2：接收回調，交換 Token</text>
+
+    <!-- Step 8: Browser hits callback -->
+    <line class="arrow-solid" x1="260" y1="460" x2="478" y2="460"/>
+    <text class="msg-code" x="290" y="453">GET /auth/callback?code=abc123&state=xyz</text>
+
+    <!-- Step 9: Validate state -->
+    <path d="M492,495 L565,495 L565,517 L492,517" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="500" y="490">驗證 state 參數（防 CSRF）</text>
+
+    <!-- Error: state mismatch -->
+    <line x1="478" y1="540" x2="267" y2="540" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="300" y="535">state 不符 → 403 CSRF detected</text>
+
+    <!-- Step 10: Exchange code for IdP token -->
+    <line x1="492" y1="590" x2="733" y2="590" stroke="#b07d2e" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-redirect)"/>
+    <text class="msg-label-bold" x="530" y="584">POST /token (IdP)</text>
+    <text class="msg-sub" x="530" y="603">authorization_code + code_verifier → 換取 IdP Token</text>
+
+    <line class="arrow-dash" x1="733" y1="610" x2="492" y2="610"/>
+    <text class="msg-sub" x="540" y="625">{access_token, id_token}</text>
+
+    <!-- Note: PKCE -->
+    <rect class="note-box" x="30" y="490" width="185" height="58"/>
+    <text class="note-text" x="40" y="506">安全機制：</text>
+    <text class="note-text" x="40" y="521">• state → 防 CSRF 攻擊</text>
+    <text class="note-text" x="40" y="536">• PKCE → 防授權碼攔截</text>
+
+    <!-- Step 11: Get userinfo -->
+    <line x1="492" y1="670" x2="733" y2="670" stroke="#b07d2e" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-redirect)"/>
+    <text class="msg-label-bold" x="530" y="664">GET /userinfo (IdP)</text>
+
+    <line class="arrow-dash" x1="733" y1="690" x2="492" y2="690"/>
+    <text class="msg-sub" x="540" y="705">{sub, email, name, ...}</text>
+
+    <!-- ================================================================ -->
+    <!-- PHASE 3: JIT + Issue JWT                                         -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="725" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="735" x2="1110" y2="735"/>
+    <text class="phase-label" x="570" y="740">Phase 3：JIT 同步 + 簽發 Auth Service JWT</text>
+
+    <!-- JIT frame -->
+    <rect class="frame-jit" x="415" y="758" width="590" height="140"/>
+    <rect class="frame-jit-label-bg" x="416" y="758" width="36" height="18"/>
+    <text class="frame-jit-label" x="423" y="770">JIT</text>
+
+    <!-- Step 12: Check local account -->
+    <line class="arrow-solid" x1="492" y1="785" x2="963" y2="785"/>
+    <text class="msg-label" x="540" y="780">查詢本地帳號 (by sub + identityProviderId)</text>
+    <line class="arrow-dash" x1="963" y1="800" x2="492" y2="800"/>
+
+    <!-- 12a: Not exist -->
+    <rect x="416" y="815" width="588" height="1" fill="none" stroke="#c4b0de" stroke-width="1" stroke-dasharray="4,3"/>
+    <text class="msg-sub" x="430" y="828" style="fill:#7c5cad;font-weight:600">[不存在]</text>
+    <line class="arrow-solid" x1="492" y1="848" x2="963" y2="848"/>
+    <text class="msg-label" x="540" y="843">建立本地帳號</text>
+    <text class="msg-sub" x="540" y="862">{accountType: "keycloak", identityProviderId: "keycloak-prod"}</text>
+    <line class="arrow-dash" x1="963" y1="875" x2="492" y2="875"/>
+
+    <!-- 12b: Exist -->
+    <rect x="416" y="885" width="588" height="1" fill="none" stroke="#c4b0de" stroke-width="1" stroke-dasharray="4,3"/>
+    <text class="msg-sub" x="430" y="898" style="fill:#7c5cad;font-weight:600">[已存在]</text>
+    <path d="M492,910 L560,910 L560,930 L492,930" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="500" y="906">更新帳號資訊 (以 IdP 為準)</text>
+
+    <!-- Step 13: Query roles -->
+    <line class="arrow-solid" x1="492" y1="960" x2="963" y2="960"/>
+    <text class="msg-label" x="540" y="955">查詢 Role Assignments + Permissions</text>
+    <line class="arrow-dash" x1="963" y1="980" x2="492" y2="980"/>
+    <text class="msg-sub" x="550" y="995">roleAssignments[], permissions[]</text>
+
+    <!-- Step 14: Create session -->
+    <line class="arrow-solid" x1="492" y1="1040" x2="963" y2="1040"/>
+    <text class="msg-label" x="540" y="1035">建立 Session record</text>
+    <line class="arrow-dash" x1="963" y1="1060" x2="492" y2="1060"/>
+    <text class="msg-sub" x="570" y="1075">sessionId</text>
+
+    <!-- Step 15: Sign JWT -->
+    <path d="M492,1100 L565,1100 L565,1132 L492,1132" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label-bold" x="500" y="1095">簽發 Auth Service JWT</text>
+    <text class="msg-sub" x="575" y="1112">payload:</text>
+    <text class="msg-sub" x="575" y="1126">sub, username, sessionId,</text>
+    <text class="msg-sub" x="575" y="1140">roleAssignments, permissions, exp</text>
+
+    <!-- Note: Auth Service JWT, NOT IdP token -->
+    <rect class="note-box-blue" x="30" y="1085" width="215" height="58"/>
+    <text class="note-text-blue" x="40" y="1101">這是 Auth Service 自己的 JWT</text>
+    <text class="note-text-blue" x="40" y="1116">不是 IdP 的 token</text>
+    <text class="note-text-blue" x="40" y="1131">IdP token 只在 Phase 2 使用</text>
+    <line x1="245" y1="1115" x2="478" y2="1115" stroke="#a8c4e8" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <!-- ================================================================ -->
+    <!-- PHASE: Return                                                    -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="1168" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="1178" x2="1110" y2="1178"/>
+    <text class="phase-label" x="570" y="1183">回傳</text>
+
+    <!-- Step 16: Return JWT -->
+    <line x1="478" y1="1210" x2="267" y2="1210" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+    <text class="msg-success" x="290" y="1204">200 OK</text>
+    <text class="msg-sub" x="290" y="1224">{accessToken, refreshToken, expiresIn}</text>
+
+    <!-- Step 17: Store JWT -->
+    <path d="M260,1250 L205,1250 L205,1270 L253,1270" stroke="#555" stroke-width="1.2" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="147" y="1263">儲存 JWT</text>
+
+    <!-- Note: no passwordChangeRequired for OAuth2 -->
+    <rect class="note-box" x="700" y="1200" width="250" height="44"/>
+    <text class="note-text" x="710" y="1216">OAuth2 帳號沒有本地密碼</text>
+    <text class="note-text" x="710" y="1231">passwordChangeRequired 固定 false</text>
+    <line x1="700" y1="1218" x2="580" y2="1210" stroke="#e0d97e" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <!-- ==================== PARTICIPANTS (BOTTOM) ==================== -->
+    <rect class="participant-box" x="30" y="1335" width="100" height="40"/>
+    <text class="participant-label" x="80" y="1355">使用者</text>
+
+    <rect class="participant-box" x="200" y="1335" width="120" height="40"/>
+    <text class="participant-label" x="260" y="1355">前端 (Browser)</text>
+
+    <rect class="participant-box" x="420" y="1335" width="130" height="40"/>
+    <text class="participant-label" x="485" y="1355">Auth Service</text>
+
+    <rect class="participant-box" x="670" y="1335" width="140" height="40"/>
+    <text class="participant-label" x="740" y="1355">External IdP</text>
+
+    <rect class="participant-box" x="920" y="1335" width="100" height="40"/>
+    <text class="participant-label" x="970" y="1355">資料庫</text>
+
+    <!-- Footer -->
+    <text class="footer" x="570" y="1410">Auth Service v3.2 · OAuth2 Login Sequence Diagram (Authorization Code Flow)</text>
+  </svg>
+
+  <div class="info">
+    <b>適用：</b>Keycloak、Google、Apple 等 OAuth2 / OIDC Provider（<code>accountType: "keycloak"</code> 等）<br>
+    <b>三階段流程：</b>Phase 1 導向 IdP 授權頁 → Phase 2 接收回調、用 authorization_code 換取 IdP token + userinfo → Phase 3 JIT 建立/更新本地帳號、簽發 Auth Service 自己的 JWT<br>
+    <b>安全機制：</b><code>state</code> 防 CSRF、<code>PKCE (code_challenge + code_verifier)</code> 防授權碼攔截<br>
+    <b>關鍵：</b>Auth Service 簽發的是自己的 JWT，IdP token 僅在 Phase 2 的 code exchange 過程中使用
+  </div>
+</div>
+</body>
+</html>
