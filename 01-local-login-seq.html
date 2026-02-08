@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>1. 登入流程 — Local（POST /tokens）</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:0;font-size:14px}
+
+.page{max-width:1100px;margin:0 auto;padding:36px 40px 48px}
+.title{font-size:20px;font-weight:700;margin-bottom:4px;color:#1a1a1a}
+.title-line{height:3px;background:linear-gradient(90deg,#4a7fd4 0%,#4a7fd4 40%,#e5e5e5 40%);margin-bottom:28px;border-radius:2px}
+
+svg{display:block;margin:0 auto}
+svg text{font-family:'Noto Sans TC',sans-serif}
+
+.participant-box{fill:#f0f4fa;stroke:#b0c4de;stroke-width:1.5;rx:6}
+.participant-label{font-size:13px;font-weight:600;fill:#2c3e6b;text-anchor:middle;dominant-baseline:central}
+.lifeline{stroke:#d0d0d0;stroke-width:1;stroke-dasharray:6,4}
+.arrow-solid{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#arrowhead)}
+.arrow-dash{stroke:#888;stroke-width:1.2;fill:none;stroke-dasharray:6,4;marker-end:url(#arrowhead-light)}
+.arrow-self{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#arrowhead)}
+.msg-label{font-size:12px;fill:#333}
+.msg-label-bold{font-size:12px;fill:#1a1a1a;font-weight:600}
+.msg-sub{font-size:10.5px;fill:#888}
+.msg-code{font-size:11.5px;fill:#c0392b;font-family:'Source Code Pro',monospace}
+.msg-error{font-size:11.5px;fill:#c0392b;font-weight:500}
+.msg-success{font-size:11.5px;fill:#1a7a3a;font-weight:500}
+.activation{fill:#e8eefc;stroke:#b0c4de;stroke-width:1;rx:2}
+.activation-db{fill:#f0e8fc;stroke:#c4b0de;stroke-width:1;rx:2}
+.frame{fill:none;stroke:#bbb;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-label-bg{fill:#f5f5f5;stroke:none}
+.frame-label{font-size:10px;fill:#888;font-weight:600;letter-spacing:0.5px}
+.phase-line{stroke:#ccc;stroke-width:1;stroke-dasharray:2,2}
+.phase-bg{fill:#f9fafb;stroke:none}
+.phase-label{font-size:10px;fill:#999;font-weight:600;text-anchor:middle;letter-spacing:1px}
+.note-box{fill:#fffde7;stroke:#e0d97e;stroke-width:1;rx:4}
+.note-text{font-size:10.5px;fill:#6b6320}
+.footer{font-size:11px;fill:#bbb;text-anchor:middle;font-family:'Source Code Pro',monospace}
+
+.info{margin-top:20px;padding:14px 16px;border-left:3px solid #4a7fd4;background:#f8fafd;font-size:13px;color:#444;line-height:1.7}
+.info b{color:#1a1a1a}
+.info code{font-family:'Source Code Pro',monospace;font-size:12px;background:#eef2f7;padding:1px 5px;border-radius:3px;color:#c0392b}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">1. 登入流程 — Local（POST /tokens）</div>
+  <div class="title-line"></div>
+
+  <svg width="1020" height="1000" viewBox="0 0 1020 1000">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+      </marker>
+      <marker id="arrowhead-light" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#888"/>
+      </marker>
+      <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/>
+      </marker>
+      <marker id="arrowhead-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#c0392b"/>
+      </marker>
+    </defs>
+
+    <!-- ==================== PARTICIPANTS (TOP) ==================== -->
+    <rect class="participant-box" x="50" y="10" width="110" height="40"/>
+    <text class="participant-label" x="105" y="30">使用者</text>
+
+    <rect class="participant-box" x="230" y="10" width="110" height="40"/>
+    <text class="participant-label" x="285" y="30">前端</text>
+
+    <rect class="participant-box" x="440" y="10" width="130" height="40"/>
+    <text class="participant-label" x="505" y="30">Auth Service</text>
+
+    <rect class="participant-box" x="700" y="10" width="110" height="40"/>
+    <text class="participant-label" x="755" y="30">資料庫</text>
+
+    <!-- ==================== LIFELINES ==================== -->
+    <line class="lifeline" x1="105" y1="50" x2="105" y2="905"/>
+    <line class="lifeline" x1="285" y1="50" x2="285" y2="905"/>
+    <line class="lifeline" x1="505" y1="50" x2="505" y2="905"/>
+    <line class="lifeline" x1="755" y1="50" x2="755" y2="905"/>
+
+    <!-- ==================== ACTIVATION BOXES ==================== -->
+    <rect class="activation" x="498" y="120" width="14" height="640"/>
+    <rect class="activation-db" x="748" y="170" width="14" height="36"/>
+    <rect class="activation-db" x="748" y="510" width="14" height="36"/>
+    <rect class="activation-db" x="748" y="590" width="14" height="36"/>
+    <rect class="activation-db" x="748" y="660" width="14" height="36"/>
+    <rect class="activation-db" x="748" y="730" width="14" height="26"/>
+
+    <!-- ==================== STEP 1: User enters credentials ==================== -->
+    <line class="arrow-solid" x1="105" y1="80" x2="278" y2="80"/>
+    <text class="msg-label" x="155" y="74">輸入帳號密碼</text>
+
+    <!-- ==================== STEP 2: Frontend POST /tokens ==================== -->
+    <line class="arrow-solid" x1="285" y1="125" x2="498" y2="125"/>
+    <text class="msg-code" x="320" y="118">POST /tokens</text>
+    <text class="msg-sub" x="320" y="140">{provider: "local", username, password}</text>
+
+    <!-- ==================== STEP 3: Query account ==================== -->
+    <line class="arrow-solid" x1="512" y1="178" x2="748" y2="178"/>
+    <text class="msg-label" x="560" y="173">查詢帳號 (by username)</text>
+
+    <line class="arrow-dash" x1="748" y1="200" x2="512" y2="200"/>
+    <text class="msg-sub" x="570" y="215">回傳帳號資料</text>
+
+    <!-- ==================== STEP 4: Validation frame ==================== -->
+    <rect class="frame" x="435" y="238" width="300" height="210"/>
+    <rect class="frame-label-bg" x="436" y="238" width="80" height="18"/>
+    <text class="frame-label" x="443" y="250">驗證流程</text>
+
+    <!-- Check status -->
+    <path class="arrow-self" d="M512,268 L570,268 L570,290 L512,290"/>
+    <text class="msg-label" x="520" y="263">檢查 status</text>
+    <text class="msg-error" x="580" y="282">disabled → 403</text>
+
+    <!-- Check locked -->
+    <path class="arrow-self" d="M512,318 L570,318 L570,340 L512,340"/>
+    <text class="msg-label" x="520" y="313">檢查 locked</text>
+    <text class="msg-error" x="580" y="332">locked → 423</text>
+
+    <!-- Check password -->
+    <path class="arrow-self" d="M512,368 L570,368 L570,390 L512,390"/>
+    <text class="msg-label" x="520" y="363">驗證密碼 (bcrypt)</text>
+    <text class="msg-error" x="580" y="382">失敗 → 401 / 423</text>
+
+    <!-- Error return -->
+    <line x1="498" y1="425" x2="292" y2="425" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="330" y="420">驗證失敗 → 回傳錯誤</text>
+
+    <!-- ==================== PHASE DIVIDER ==================== -->
+    <rect class="phase-bg" x="30" y="468" width="960" height="20"/>
+    <line class="phase-line" x1="30" y1="478" x2="990" y2="478"/>
+    <text class="phase-label" x="510" y="483">驗證通過</text>
+
+    <!-- ==================== STEP 5: Query roles ==================== -->
+    <line class="arrow-solid" x1="512" y1="520" x2="748" y2="520"/>
+    <text class="msg-label" x="545" y="515">查詢 Role Assignments + Permissions</text>
+
+    <line class="arrow-dash" x1="748" y1="540" x2="512" y2="540"/>
+    <text class="msg-sub" x="570" y="555">roleAssignments[], permissions[]</text>
+
+    <!-- ==================== STEP 6: Create session ==================== -->
+    <line class="arrow-solid" x1="512" y1="600" x2="748" y2="600"/>
+    <text class="msg-label" x="560" y="595">建立 Session record</text>
+
+    <line class="arrow-dash" x1="748" y1="620" x2="512" y2="620"/>
+    <text class="msg-sub" x="590" y="635">sessionId</text>
+
+    <!-- ==================== STEP 7: Sign JWT (self-loop) ==================== -->
+    <path class="arrow-self" d="M512,668 L580,668 L580,700 L512,700"/>
+    <text class="msg-label-bold" x="520" y="662">簽發 JWT</text>
+    <text class="msg-sub" x="590" y="680">payload:</text>
+    <text class="msg-sub" x="590" y="694">sub, username, sessionId,</text>
+    <text class="msg-sub" x="590" y="708">roleAssignments, permissions, exp</text>
+
+    <!-- ==================== STEP 8: Update lastLoginAt ==================== -->
+    <line class="arrow-solid" x1="512" y1="738" x2="748" y2="738"/>
+    <text class="msg-label" x="545" y="733">更新 lastLoginAt、重設失敗次數</text>
+
+    <!-- ==================== PHASE DIVIDER 2 ==================== -->
+    <rect class="phase-bg" x="30" y="775" width="960" height="20"/>
+    <line class="phase-line" x1="30" y1="785" x2="990" y2="785"/>
+    <text class="phase-label" x="510" y="790">回傳</text>
+
+    <!-- ==================== STEP 9: Return JWT ==================== -->
+    <line x1="498" y1="818" x2="292" y2="818" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+    <text class="msg-success" x="310" y="812">200 OK</text>
+    <text class="msg-sub" x="310" y="832">{accessToken, refreshToken, expiresIn, passwordChangeRequired}</text>
+
+    <!-- ==================== STEP 10: Store JWT ==================== -->
+    <path d="M285,855 L230,855 L230,875 L278,875" stroke="#555" stroke-width="1.2" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="172" y="868">儲存 JWT</text>
+
+    <!-- ==================== NOTE: passwordChangeRequired ==================== -->
+    <!-- Moved to right side to avoid overlap -->
+    <rect class="note-box" x="640" y="808" width="210" height="58"/>
+    <text class="note-text" x="650" y="824">若 passwordChangeRequired = true</text>
+    <text class="note-text" x="650" y="839">前端導向「強制修改密碼」頁面</text>
+    <text class="note-text" x="650" y="854">（不阻擋登入，回傳 flag）</text>
+    <!-- Connector line from note to return arrow -->
+    <line x1="640" y1="830" x2="580" y2="818" stroke="#e0d97e" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <!-- ==================== PARTICIPANTS (BOTTOM) ==================== -->
+    <rect class="participant-box" x="50" y="910" width="110" height="40"/>
+    <text class="participant-label" x="105" y="930">使用者</text>
+
+    <rect class="participant-box" x="230" y="910" width="110" height="40"/>
+    <text class="participant-label" x="285" y="930">前端</text>
+
+    <rect class="participant-box" x="440" y="910" width="130" height="40"/>
+    <text class="participant-label" x="505" y="930">Auth Service</text>
+
+    <rect class="participant-box" x="700" y="910" width="110" height="40"/>
+    <text class="participant-label" x="755" y="930">資料庫</text>
+
+    <!-- Footer -->
+    <text class="footer" x="510" y="978">Auth Service v3.2 · Local Login Sequence Diagram</text>
+  </svg>
+
+  <div class="info">
+    <b>適用：</b>本地帳號（<code>accountType: "local"</code>）<br>
+    <b>重點：</b>登入同時產生 JWT + Session。JWT 內含 <code>roleAssignments</code>（SBAC）和 <code>permissions</code>（扁平化聯集）。密碼驗證失敗超過 <code>maxAttempts</code> 會鎖定帳號。
+  </div>
+</div>
+</body>
+</html>

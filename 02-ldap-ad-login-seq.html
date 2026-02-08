@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>2. 登入流程 — AD/LDAP（POST /tokens）</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:0;font-size:14px}
+
+.page{max-width:1200px;margin:0 auto;padding:36px 40px 48px}
+.title{font-size:20px;font-weight:700;margin-bottom:4px;color:#1a1a1a}
+.title-line{height:3px;background:linear-gradient(90deg,#4a7fd4 0%,#4a7fd4 40%,#e5e5e5 40%);margin-bottom:28px;border-radius:2px}
+
+svg{display:block;margin:0 auto}
+svg text{font-family:'Noto Sans TC',sans-serif}
+
+.participant-box{fill:#f0f4fa;stroke:#b0c4de;stroke-width:1.5;rx:6}
+.participant-label{font-size:13px;font-weight:600;fill:#2c3e6b;text-anchor:middle;dominant-baseline:central}
+.lifeline{stroke:#d0d0d0;stroke-width:1;stroke-dasharray:6,4}
+.arrow-solid{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#arrowhead)}
+.arrow-dash{stroke:#888;stroke-width:1.2;fill:none;stroke-dasharray:6,4;marker-end:url(#arrowhead-light)}
+.arrow-self{stroke:#555;stroke-width:1.5;fill:none;marker-end:url(#arrowhead)}
+.msg-label{font-size:12px;fill:#333}
+.msg-label-bold{font-size:12px;fill:#1a1a1a;font-weight:600}
+.msg-sub{font-size:10.5px;fill:#888}
+.msg-code{font-size:11.5px;fill:#c0392b;font-family:'Source Code Pro',monospace}
+.msg-error{font-size:11.5px;fill:#c0392b;font-weight:500}
+.msg-success{font-size:11.5px;fill:#1a7a3a;font-weight:500}
+.activation{fill:#e8eefc;stroke:#b0c4de;stroke-width:1;rx:2}
+.activation-db{fill:#f0e8fc;stroke:#c4b0de;stroke-width:1;rx:2}
+.activation-ad{fill:#fef3e2;stroke:#deb87a;stroke-width:1;rx:2}
+.frame{fill:none;stroke:#bbb;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-label-bg{fill:#f5f5f5;stroke:none}
+.frame-label{font-size:10px;fill:#888;font-weight:600;letter-spacing:0.5px}
+.frame-jit{fill:rgba(240,232,252,0.15);stroke:#c4b0de;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-jit-label-bg{fill:#f3eefa;stroke:none}
+.frame-jit-label{font-size:10px;fill:#7c5cad;font-weight:600;letter-spacing:0.5px}
+.phase-line{stroke:#ccc;stroke-width:1;stroke-dasharray:2,2}
+.phase-bg{fill:#f9fafb;stroke:none}
+.phase-label{font-size:10px;fill:#999;font-weight:600;text-anchor:middle;letter-spacing:1px}
+.note-box{fill:#fffde7;stroke:#e0d97e;stroke-width:1;rx:4}
+.note-text{font-size:10.5px;fill:#6b6320}
+.note-box-blue{fill:#eef4ff;stroke:#a8c4e8;stroke-width:1;rx:4}
+.note-text-blue{font-size:10.5px;fill:#2c5282}
+.footer{font-size:11px;fill:#bbb;text-anchor:middle;font-family:'Source Code Pro',monospace}
+
+.info{margin-top:20px;padding:14px 16px;border-left:3px solid #4a7fd4;background:#f8fafd;font-size:13px;color:#444;line-height:1.7}
+.info b{color:#1a1a1a}
+.info code{font-family:'Source Code Pro',monospace;font-size:12px;background:#eef2f7;padding:1px 5px;border-radius:3px;color:#c0392b}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">2. 登入流程 — AD / LDAP（POST /tokens）</div>
+  <div class="title-line"></div>
+
+  <svg width="1140" height="1180" viewBox="0 0 1140 1180">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+      </marker>
+      <marker id="arrowhead-light" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#888"/>
+      </marker>
+      <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/>
+      </marker>
+      <marker id="arrowhead-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#c0392b"/>
+      </marker>
+      <marker id="arrowhead-ad" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#b07d2e"/>
+      </marker>
+    </defs>
+
+    <!-- ==================== PARTICIPANTS (TOP) ==================== -->
+    <rect class="participant-box" x="30" y="10" width="100" height="40"/>
+    <text class="participant-label" x="80" y="30">使用者</text>
+
+    <rect class="participant-box" x="200" y="10" width="100" height="40"/>
+    <text class="participant-label" x="250" y="30">前端</text>
+
+    <rect class="participant-box" x="400" y="10" width="130" height="40"/>
+    <text class="participant-label" x="465" y="30">Auth Service</text>
+
+    <rect class="participant-box" x="660" y="10" width="140" height="40"/>
+    <text class="participant-label" x="730" y="30">AD / LDAP Server</text>
+
+    <rect class="participant-box" x="910" y="10" width="100" height="40"/>
+    <text class="participant-label" x="960" y="30">資料庫</text>
+
+    <!-- ==================== LIFELINES ==================== -->
+    <line class="lifeline" x1="80" y1="50" x2="80" y2="1080"/>
+    <line class="lifeline" x1="250" y1="50" x2="250" y2="1080"/>
+    <line class="lifeline" x1="465" y1="50" x2="465" y2="1080"/>
+    <line class="lifeline" x1="730" y1="50" x2="730" y2="1080"/>
+    <line class="lifeline" x1="960" y1="50" x2="960" y2="1080"/>
+
+    <!-- ==================== ACTIVATION BOXES ==================== -->
+    <!-- Auth Service main -->
+    <rect class="activation" x="458" y="120" width="14" height="810"/>
+    <!-- AD activations -->
+    <rect class="activation-ad" x="723" y="225" width="14" height="36"/>
+    <rect class="activation-ad" x="723" y="300" width="14" height="36"/>
+    <!-- DB activations -->
+    <rect class="activation-db" x="953" y="160" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="420" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="500" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="610" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="690" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="760" width="14" height="36"/>
+    <rect class="activation-db" x="953" y="835" width="14" height="26"/>
+
+    <!-- ==================== STEP 1: User enters credentials ==================== -->
+    <line class="arrow-solid" x1="80" y1="80" x2="243" y2="80"/>
+    <text class="msg-label" x="120" y="74">輸入帳號密碼</text>
+
+    <!-- ==================== STEP 2: Frontend POST /tokens ==================== -->
+    <line class="arrow-solid" x1="250" y1="125" x2="458" y2="125"/>
+    <text class="msg-code" x="285" y="118">POST /tokens</text>
+    <text class="msg-sub" x="285" y="140">{provider: "my-ad", username, password}</text>
+
+    <!-- ==================== STEP 3: Query IdP config ==================== -->
+    <line class="arrow-solid" x1="472" y1="170" x2="953" y2="170"/>
+    <text class="msg-label" x="520" y="165">查詢 IdP 設定 (provider = "my-ad")</text>
+
+    <line class="arrow-dash" x1="953" y1="190" x2="472" y2="190"/>
+    <text class="msg-sub" x="530" y="205">LDAP URL, baseDN, bindDN, searchFilter...</text>
+
+    <!-- ==================== STEP 4: LDAP Bind ==================== -->
+    <line x1="472" y1="235" x2="723" y2="235" stroke="#b07d2e" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-ad)"/>
+    <text class="msg-label-bold" x="510" y="229">LDAP Bind 驗證</text>
+    <text class="msg-sub" x="510" y="248">用 username + password 向 AD 發起 bind</text>
+
+    <line class="arrow-dash" x1="723" y1="255" x2="472" y2="255"/>
+
+    <!-- Error: Bind failed -->
+    <line x1="458" y1="280" x2="257" y2="280" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="290" y="275">Bind 失敗 → 401 Invalid credentials</text>
+
+    <!-- ==================== STEP 5: LDAP Search ==================== -->
+    <line x1="472" y1="310" x2="723" y2="310" stroke="#b07d2e" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-ad)"/>
+    <text class="msg-label" x="510" y="305">LDAP Search：查詢使用者屬性</text>
+
+    <line class="arrow-dash" x1="723" y1="330" x2="472" y2="330"/>
+    <text class="msg-sub" x="510" y="345">驗證成功 + 使用者資訊 (email, displayName, groups...)</text>
+
+    <!-- ==================== PHASE: JIT ==================== -->
+    <rect class="phase-bg" x="30" y="370" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="380" x2="1110" y2="380"/>
+    <text class="phase-label" x="570" y="385">JIT — Just-In-Time 帳號同步</text>
+
+    <!-- ==================== JIT Frame ==================== -->
+    <rect class="frame-jit" x="395" y="405" width="600" height="160"/>
+    <rect class="frame-jit-label-bg" x="396" y="405" width="36" height="18"/>
+    <text class="frame-jit-label" x="403" y="417">JIT</text>
+
+    <!-- Step 6: Check local account -->
+    <line class="arrow-solid" x1="472" y1="430" x2="953" y2="430"/>
+    <text class="msg-label" x="520" y="425">查詢本地帳號 (by username + identityProviderId)</text>
+
+    <line class="arrow-dash" x1="953" y1="450" x2="472" y2="450"/>
+
+    <!-- Step 6a: Not exist → create -->
+    <!-- Alt label -->
+    <rect x="396" y="468" width="598" height="1" fill="none" stroke="#c4b0de" stroke-width="1" stroke-dasharray="4,3"/>
+    <text class="msg-sub" x="410" y="480" style="fill:#7c5cad;font-weight:600">[不存在]</text>
+
+    <line class="arrow-solid" x1="472" y1="500" x2="953" y2="500"/>
+    <text class="msg-label" x="520" y="495">建立本地帳號</text>
+    <text class="msg-sub" x="520" y="514">{username, displayName, email, accountType: "ad", identityProviderId: "my-ad"}</text>
+
+    <line class="arrow-dash" x1="953" y1="530" x2="472" y2="530"/>
+
+    <!-- Step 6b: Exist → update -->
+    <rect x="396" y="540" width="598" height="1" fill="none" stroke="#c4b0de" stroke-width="1" stroke-dasharray="4,3"/>
+    <text class="msg-sub" x="410" y="553" style="fill:#7c5cad;font-weight:600">[已存在]</text>
+
+    <path class="arrow-self" d="M472,565 L540,565 L540,585 L472,585"/>
+    <text class="msg-label" x="480" y="560">更新帳號資訊 (以 AD 為準)</text>
+
+    <!-- Note: JIT -->
+    <rect class="note-box-blue" x="30" y="430" width="190" height="72"/>
+    <text class="note-text-blue" x="40" y="446">JIT 建立的帳號：</text>
+    <text class="note-text-blue" x="40" y="461">• 沒有本地密碼</text>
+    <text class="note-text-blue" x="40" y="476">• Role 需管理者另行指派</text>
+    <text class="note-text-blue" x="40" y="491">• 只能透過該 IdP 登入</text>
+
+    <!-- ==================== PHASE: Status check ==================== -->
+    <rect class="phase-bg" x="30" y="578" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="588" x2="1110" y2="588"/>
+    <text class="phase-label" x="570" y="593">帳號狀態檢查（同本地登入）</text>
+
+    <!-- Step 7: Check status/locked -->
+    <rect class="frame" x="395" y="608" width="300" height="70"/>
+    <rect class="frame-label-bg" x="396" y="608" width="80" height="18"/>
+    <text class="frame-label" x="403" y="620">驗證流程</text>
+
+    <path class="arrow-self" d="M472,638 L540,638 L540,660 L472,660"/>
+    <text class="msg-label" x="480" y="633">檢查 status / locked</text>
+    <text class="msg-error" x="548" y="655">disabled → 403 / locked → 423</text>
+
+    <!-- ==================== STEP 8: Query roles ==================== -->
+    <line class="arrow-solid" x1="472" y1="700" x2="953" y2="700"/>
+    <text class="msg-label" x="520" y="695">查詢 Role Assignments + Permissions</text>
+
+    <line class="arrow-dash" x1="953" y1="720" x2="472" y2="720"/>
+    <text class="msg-sub" x="530" y="735">roleAssignments[], permissions[]</text>
+
+    <!-- ==================== STEP 9: Create session ==================== -->
+    <line class="arrow-solid" x1="472" y1="770" x2="953" y2="770"/>
+    <text class="msg-label" x="520" y="765">建立 Session record</text>
+
+    <line class="arrow-dash" x1="953" y1="790" x2="472" y2="790"/>
+    <text class="msg-sub" x="560" y="805">sessionId</text>
+
+    <!-- ==================== STEP 10: Sign JWT ==================== -->
+    <path class="arrow-self" d="M472,830 L545,830 L545,862 L472,862"/>
+    <text class="msg-label-bold" x="480" y="825">簽發 JWT</text>
+    <text class="msg-sub" x="555" y="842">payload:</text>
+    <text class="msg-sub" x="555" y="856">sub, username, sessionId,</text>
+    <text class="msg-sub" x="555" y="870">roleAssignments, permissions, exp</text>
+
+    <!-- ==================== STEP 11: Update lastLoginAt ==================== -->
+    <line class="arrow-solid" x1="472" y1="895" x2="953" y2="895"/>
+    <text class="msg-label" x="520" y="890">更新 lastLoginAt</text>
+
+    <!-- ==================== PHASE: Return ==================== -->
+    <rect class="phase-bg" x="30" y="920" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="930" x2="1110" y2="930"/>
+    <text class="phase-label" x="570" y="935">回傳</text>
+
+    <!-- ==================== STEP 12: Return JWT ==================== -->
+    <line x1="458" y1="960" x2="257" y2="960" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+    <text class="msg-success" x="275" y="954">200 OK</text>
+    <text class="msg-sub" x="275" y="974">{accessToken, refreshToken, expiresIn, passwordChangeRequired}</text>
+
+    <!-- ==================== STEP 13: Store JWT ==================== -->
+    <path d="M250,995 L195,995 L195,1015 L243,1015" stroke="#555" stroke-width="1.2" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="137" y="1008">儲存 JWT</text>
+
+    <!-- ==================== NOTE: AD differences ==================== -->
+    <rect class="note-box" x="700" y="950" width="250" height="72"/>
+    <text class="note-text" x="710" y="966">與 Local 登入差異：</text>
+    <text class="note-text" x="710" y="981">• 密碼驗證由 AD Server 負責</text>
+    <text class="note-text" x="710" y="996">• Auth Service 不存密碼</text>
+    <text class="note-text" x="710" y="1011">• passwordChangeRequired 通常 false</text>
+    <line x1="700" y1="980" x2="590" y2="960" stroke="#e0d97e" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <!-- ==================== PARTICIPANTS (BOTTOM) ==================== -->
+    <rect class="participant-box" x="30" y="1085" width="100" height="40"/>
+    <text class="participant-label" x="80" y="1105">使用者</text>
+
+    <rect class="participant-box" x="200" y="1085" width="100" height="40"/>
+    <text class="participant-label" x="250" y="1105">前端</text>
+
+    <rect class="participant-box" x="400" y="1085" width="130" height="40"/>
+    <text class="participant-label" x="465" y="1105">Auth Service</text>
+
+    <rect class="participant-box" x="660" y="1085" width="140" height="40"/>
+    <text class="participant-label" x="730" y="1105">AD / LDAP Server</text>
+
+    <rect class="participant-box" x="910" y="1085" width="100" height="40"/>
+    <text class="participant-label" x="960" y="1105">資料庫</text>
+
+    <!-- Footer -->
+    <text class="footer" x="570" y="1155">Auth Service v3.2 · AD/LDAP Login Sequence Diagram</text>
+  </svg>
+
+  <div class="info">
+    <b>適用：</b>Active Directory、LDAP（<code>accountType: "ad"</code>）<br>
+    <b>JIT 同步：</b>外部使用者首次登入時自動建立本地帳號 record，後續登入以 AD 回傳的屬性更新本地資料。JIT 帳號沒有本地密碼，Role Assignment 需管理者另行指派。<br>
+    <b>與 Local 差異：</b>密碼驗證由 AD Server 負責（LDAP Bind），Auth Service 不存密碼。帳號鎖定由 Auth Service 本地 <code>locked</code> 狀態控制，與 AD 端鎖定獨立。
+  </div>
+</div>
+</body>
+</html>
