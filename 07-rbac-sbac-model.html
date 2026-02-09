@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>07 - RBAC + SBAC 關係模型</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:40px;font-size:14px;line-height:1.6}
+.container{max-width:900px;margin:0 auto}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:#666;font-family:'Source Code Pro',monospace;margin-bottom:32px}
+code{font-family:'Source Code Pro',monospace;font-size:12px;background:#f5f5f5;padding:1px 5px;border-radius:3px;color:#d14}
+
+.section{font-weight:700;font-size:15px;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e5e5e5}
+
+/* ER entities */
+.er{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;justify-content:center;margin-bottom:28px}
+.entity{border:1px solid #d1d5db;border-radius:8px;min-width:170px;overflow:hidden;background:#fff}
+.entity-h{padding:8px 12px;font-weight:700;font-size:13px;border-bottom:1px solid #d1d5db;background:#f9fafb}
+.entity-b{padding:8px 12px}
+.field{display:flex;justify-content:space-between;padding:2px 0;font-size:12px;gap:10px}
+.f-name{font-family:'Source Code Pro',monospace;color:#0550ae}
+.f-type{color:#999;font-size:11px}
+.f-pk{color:#d97706;font-weight:600}
+.f-fk{color:#c0392b;font-weight:600}
+
+.rel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px;font-size:11px;color:#999;font-family:'Source Code Pro',monospace}
+.rel-line{width:30px;height:1px;background:#ccc;margin:2px 0}
+
+/* Concept grid */
+.concepts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.concept{border:1px solid #e5e5e5;border-radius:6px;padding:14px}
+.concept-title{font-weight:700;font-size:13px;margin-bottom:6px}
+.concept-desc{font-size:13px;color:#555;line-height:1.6}
+
+/* Example */
+.example{border:1px solid #e5e5e5;border-radius:8px;padding:16px;margin-bottom:16px}
+.ex-title{font-weight:700;font-size:15px;margin-bottom:12px}
+.ex-account{padding:12px;background:#f9fafb;border-radius:6px;margin-bottom:10px}
+.ex-name{font-weight:700;font-size:14px;margin-bottom:6px;color:#0550ae}
+.ex-row{display:flex;gap:6px;align-items:center;margin:4px 0;font-size:13px;flex-wrap:wrap}
+.badge-role{padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;background:#dcfce7;color:#166534;border:1px solid #86efac}
+.badge-scope{padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
+.badge-null{background:#f5f5f5;color:#888;border:1px solid #ddd}
+.ex-perms{font-size:12px;color:#666;margin-top:6px;font-family:'Source Code Pro',monospace;line-height:1.6}
+
+.note{margin-top:24px;padding:14px 16px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#444;background:#f9fafb;line-height:1.7}
+.note b{color:#1a1a1a}
+.wm{text-align:center;margin-top:24px;font-size:11px;color:#bbb;font-family:'Source Code Pro',monospace}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>07 — RBAC + SBAC 關係模型</h1>
+  <div class="sub">Account · RoleAssignment · Role · Permission · Scope 的資料關聯</div>
+
+  <!-- ER Diagram -->
+  <div class="er">
+    <div class="entity">
+      <div class="entity-h">Account</div>
+      <div class="entity-b">
+        <div class="field"><span class="f-name f-pk">id</span><span class="f-type">UUID PK</span></div>
+        <div class="field"><span class="f-name">username</span><span class="f-type">UNIQUE</span></div>
+        <div class="field"><span class="f-name">displayName</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">status</span><span class="f-type">active|disabled</span></div>
+        <div class="field"><span class="f-name">accountType</span><span class="f-type">local|ad|...</span></div>
+      </div>
+    </div>
+    <div class="rel"><span>1</span><div class="rel-line"></div><span>has N</span><div class="rel-line"></div><span>→</span></div>
+    <div class="entity" style="border-color:#d8b4fe">
+      <div class="entity-h" style="background:#faf5ff">RoleAssignment</div>
+      <div class="entity-b">
+        <div class="field"><span class="f-name f-pk">id</span><span class="f-type">UUID PK</span></div>
+        <div class="field"><span class="f-name f-fk">accountId</span><span class="f-type">FK → Account</span></div>
+        <div class="field"><span class="f-name f-fk">roleId</span><span class="f-type">FK → Role</span></div>
+        <div class="field"><span class="f-name f-fk">scopeId</span><span class="f-type">FK? → Scope</span></div>
+      </div>
+    </div>
+    <div class="rel"><span>N</span><div class="rel-line"></div><span>refs 1</span><div class="rel-line"></div><span>→</span></div>
+    <div class="entity">
+      <div class="entity-h">Role</div>
+      <div class="entity-b">
+        <div class="field"><span class="f-name f-pk">id</span><span class="f-type">UUID PK</span></div>
+        <div class="field"><span class="f-name">name</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">namespace</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">isBuiltIn</span><span class="f-type">boolean</span></div>
+      </div>
+    </div>
+    <div class="rel"><span>N</span><div class="rel-line"></div><span>has M</span><div class="rel-line"></div><span>→</span></div>
+    <div class="entity">
+      <div class="entity-h">Permission</div>
+      <div class="entity-b">
+        <div class="field"><span class="f-name f-pk">id</span><span class="f-type">UUID PK</span></div>
+        <div class="field"><span class="f-name">code</span><span class="f-type">UNIQUE</span></div>
+        <div class="field"><span class="f-name">name</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">namespace</span><span class="f-type">string</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin:-16px 0 20px">
+    <span style="font-size:12px;color:#888">RoleAssignment 的 <code>scopeId</code> 可為 null（不限 Scope） ↓</span>
+  </div>
+
+  <div class="er" style="justify-content:center">
+    <div class="entity" style="border-color:#fdba74">
+      <div class="entity-h" style="background:#fff7ed">Scope</div>
+      <div class="entity-b">
+        <div class="field"><span class="f-name f-pk">id</span><span class="f-type">UUID PK</span></div>
+        <div class="field"><span class="f-name">name</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">namespace</span><span class="f-type">string</span></div>
+        <div class="field"><span class="f-name">description</span><span class="f-type">string</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">概念說明</div>
+  <div class="concepts">
+    <div class="concept">
+      <div class="concept-title">Role（角色）</div>
+      <div class="concept-desc">動態，可 CRUD / Import。一個 Role 包含多個 Permission（多對多）。例：SuperAdmin, Operator, Viewer</div>
+    </div>
+    <div class="concept">
+      <div class="concept-title">Permission（權限）</div>
+      <div class="concept-desc">固定清單，只能讀取不可 CRUD。由 Bootstrap（auth:*）或 Import（scc-web:*）建立。命名：<code>{ns}:{resource}:{action}</code></div>
+    </div>
+    <div class="concept">
+      <div class="concept-title">Scope（範圍）</div>
+      <div class="concept-desc">抽象標籤，Auth Service 只管名字。「Scope 包含哪些實際資源」由應用層定義。例：Rack-A, Floor-3</div>
+    </div>
+    <div class="concept">
+      <div class="concept-title">RoleAssignment（角色指派）</div>
+      <div class="concept-desc">核心：Account + Role + Scope。scopeId: null = 不限制。一個帳號可有多個 Assignment</div>
+    </div>
+  </div>
+
+  <div class="section">具體範例</div>
+  <div class="example">
+    <div class="ex-account">
+      <div class="ex-name">Derek</div>
+      <div class="ex-row"><span class="badge-role">SuperAdmin</span> + <span class="badge-scope badge-null">scope: null（全部）</span></div>
+      <div class="ex-row"><span class="badge-role">Operator</span> + <span class="badge-scope">Rack-A</span></div>
+      <div class="ex-perms">→ JWT.permissions: auth:accounts:read, auth:accounts:write, auth:scopes:manage, web:servers:manage, ...</div>
+    </div>
+    <div class="ex-account">
+      <div class="ex-name">Alice</div>
+      <div class="ex-row"><span class="badge-role">Viewer</span> + <span class="badge-scope">Rack-A</span></div>
+      <div class="ex-row"><span class="badge-role">Viewer</span> + <span class="badge-scope">Rack-B</span></div>
+      <div class="ex-perms">→ JWT.permissions: web:dashboard:view, web:servers:read<br>→ JWT.roleAssignments: [{Viewer, Rack-A}, {Viewer, Rack-B}] — 應用層根據此過濾資源</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>RBAC vs SBAC 分工：</b>RBAC（Role → Permission）決定「能做什麼」— Auth Service 的 @RequirePermission 檢查。SBAC（Scope）決定「能看到哪些資源」— SCC 應用層的資源過濾。Auth Service API 本身不受 Scope 限制。
+  </div>
+  <div class="wm">Auth Service v3.2 · RBAC + SBAC Relationship Model</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>10 - SBAC 應用層資源過濾</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:40px;font-size:14px;line-height:1.6}
+.container{max-width:860px;margin:0 auto}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:#666;font-family:'Source Code Pro',monospace;margin-bottom:32px}
+code{font-family:'Source Code Pro',monospace;font-size:12px;background:#f5f5f5;padding:1px 5px;border-radius:3px;color:#d14}
+
+.section{font-weight:700;font-size:15px;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e5e5e5}
+
+/* Layers */
+.layers{display:flex;flex-direction:column;gap:0;margin-bottom:28px}
+.layer{padding:12px 16px;border:1px solid #e5e5e5;display:flex;gap:14px;align-items:center;font-size:13px}
+.layer:first-child{border-radius:6px 6px 0 0}
+.layer:last-child{border-radius:0 0 6px 6px}
+.layer+.layer{border-top:none}
+.layer-tag{font-size:11px;font-family:'Source Code Pro',monospace;padding:3px 10px;border-radius:4px;font-weight:600;min-width:100px;text-align:center;flex-shrink:0}
+.lt-fe{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
+.lt-scc{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.lt-auth{background:#faf5ff;color:#6b21a8;border:1px solid #d8b4fe}
+.l-fe{background:#f8fafc}
+.l-scc{background:#fafff9}
+.l-auth{background:#fcfaff}
+
+/* Steps */
+.steps{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.s{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border:1px solid #e5e5e5;border-radius:6px;font-size:13px}
+.s-n{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:#fff}
+.n-blue{background:#4a7fd4}.n-gray{background:#888}.n-green{background:#3a9a5c}.n-orange{background:#d97706}.n-red{background:#c0392b}
+
+/* Scope map */
+.scope-map{border:1px solid #e5e5e5;border-radius:8px;padding:16px;margin-bottom:20px}
+.map-title{font-weight:700;font-size:14px;margin-bottom:4px}
+.map-sub{font-size:12px;color:#888;margin-bottom:10px}
+.map-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.map-row:last-child{border-bottom:none}
+.scope-tag{padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;min-width:70px;text-align:center}
+.scope-null{background:#f5f5f5;color:#888;border-color:#ddd}
+.res-tags{display:flex;gap:4px;flex-wrap:wrap}
+.res-tag{padding:2px 6px;border-radius:3px;font-size:11px;background:#f5f5f5;color:#555;border:1px solid #e5e5e5}
+
+/* Scenario grid */
+.scenarios{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sc{border:1px solid #e5e5e5;border-radius:6px;overflow:hidden}
+.sc-h{padding:8px 12px;font-weight:600;font-size:13px;border-bottom:1px solid #e5e5e5;background:#f9fafb}
+.sc-b{padding:12px;font-size:13px}
+.sc-jwt{font-family:'Source Code Pro',monospace;font-size:11px;padding:6px 10px;background:#f8fafc;border-radius:4px;margin:6px 0;color:#555;line-height:1.6;border:1px solid #e8e8e8}
+.sc-result{margin-top:6px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.sc-ok{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.sc-partial{background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
+.sc-fail{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5}
+
+.note{margin-top:24px;padding:14px 16px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#444;background:#f9fafb;line-height:1.7}
+.note b{color:#1a1a1a}
+.wm{text-align:center;margin-top:24px;font-size:11px;color:#bbb;font-family:'Source Code Pro',monospace}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>10 — SBAC 應用層資源過濾</h1>
+  <div class="sub">Auth Service 提供 Scope 標籤 → SCC 應用層負責實際過濾</div>
+
+  <div class="section">架構分層</div>
+  <div class="layers">
+    <div class="layer l-fe"><div class="layer-tag lt-fe">Frontend</div>發送 API 請求，Header 帶 JWT</div>
+    <div class="layer l-scc"><div class="layer-tag lt-scc">SCC 應用層</div><b>① RBAC 檢查</b>：JWT.permissions 是否包含所需 permission &nbsp;|&nbsp; <b>② SBAC 過濾</b>：根據 scope 過濾資源</div>
+    <div class="layer l-auth"><div class="layer-tag lt-auth">Auth Service</div>只負責簽發 JWT（含 roleAssignments + permissions）、管理 Scope 標籤</div>
+  </div>
+
+  <div class="section">請求流程：GET /api/servers</div>
+  <div class="steps">
+    <div class="s"><div class="s-n n-blue">1</div><div>Frontend → <code>GET /api/servers</code> Header: Authorization: Bearer {JWT}</div></div>
+    <div class="s"><div class="s-n n-green">2</div><div>SCC 解析 JWT → 取出 <code>permissions</code> 和 <code>roleAssignments</code></div></div>
+    <div class="s"><div class="s-n n-green">3</div><div><b>RBAC 檢查</b>：permissions 包含 <code>web:servers:read</code>？沒有 → 403</div></div>
+    <div class="s"><div class="s-n n-orange">4</div><div><b>SBAC 過濾</b>：在 roleAssignments 中找包含 web:servers:read 的 role，取出其 scope</div></div>
+    <div class="s"><div class="s-n n-orange">5</div><div>查詢 Scope ↔ Resource 對應表（SCC 自己維護）→ 過濾資源清單</div></div>
+    <div class="s"><div class="s-n n-blue">6</div><div>回傳過濾後的結果</div></div>
+  </div>
+
+  <div class="section">Scope ↔ 實際資源對應（SCC 維護）</div>
+  <div class="scope-map">
+    <div class="map-sub">Auth Service 只管左邊的 Scope 名字，右邊的資源對應由 SCC 定義</div>
+    <div class="map-row"><div class="scope-tag">Rack-A</div><span>→</span><div class="res-tags"><div class="res-tag">Server-001</div><div class="res-tag">Server-002</div><div class="res-tag">Server-003</div><div class="res-tag">Switch-A1</div></div></div>
+    <div class="map-row"><div class="scope-tag">Rack-B</div><span>→</span><div class="res-tags"><div class="res-tag">Server-004</div><div class="res-tag">Server-005</div><div class="res-tag">Switch-B1</div></div></div>
+    <div class="map-row"><div class="scope-tag scope-null">null（不限）</div><span>→</span><div class="res-tags"><div class="res-tag">所有資源</div></div></div>
+  </div>
+
+  <div class="section">四個場景</div>
+  <div class="scenarios">
+    <div class="sc">
+      <div class="sc-h" style="color:#166534">✓ Derek — SuperAdmin, scope: null</div>
+      <div class="sc-b">
+        <div class="sc-jwt">scope: null → 不過濾</div>
+        <div class="sc-result sc-ok">回傳所有伺服器</div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-h" style="color:#9a3412">⚡ Alice — Viewer, scope: Rack-A</div>
+      <div class="sc-b">
+        <div class="sc-jwt">scope: "Rack-A" → 查對應表</div>
+        <div class="sc-result sc-partial">只回傳 Server-001, 002, 003, Switch-A1</div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-h" style="color:#9a3412">⚡ Bob — Viewer, scope: Rack-A + Rack-B</div>
+      <div class="sc-b">
+        <div class="sc-jwt">多個 scope → 取聯集</div>
+        <div class="sc-result sc-partial">Rack-A ∪ Rack-B 的所有資源</div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-h" style="color:#991b1b">✗ Charlie — 無 web:servers:read</div>
+      <div class="sc-b">
+        <div class="sc-jwt">RBAC 檢查失敗</div>
+        <div class="sc-result sc-fail">403 Forbidden（不需做 Scope 過濾）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>責任分界：</b>Auth Service 負責管理 Scope 標籤（CRUD）、把 roleAssignments 寫入 JWT。SCC 應用層負責維護 Scope ↔ 實際資源的對應表、在 API 回應中根據 scope 過濾資源。這讓 Auth Service 保持通用，SCC 可以自由定義 scope 的語義。
+  </div>
+  <div class="wm">Auth Service v3.2 · SBAC Resource Filtering</div>
+</div>
+</body>
+</html>

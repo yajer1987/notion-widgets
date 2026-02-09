@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>08 - Import API 流程</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:40px;font-size:14px;line-height:1.6}
+.container{max-width:820px;margin:0 auto}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:#666;font-family:'Source Code Pro',monospace;margin-bottom:32px}
+code{font-family:'Source Code Pro',monospace;font-size:12px;background:#f5f5f5;padding:1px 5px;border-radius:3px;color:#d14}
+
+.section{font-weight:700;font-size:15px;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #e5e5e5}
+
+/* Three modes */
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px}
+.mode{border:1px solid #e5e5e5;border-radius:6px;padding:14px;text-align:center}
+.mode-name{font-weight:700;font-size:16px;font-family:'Source Code Pro',monospace;margin-bottom:6px}
+.mode-desc{font-size:12px;color:#666;line-height:1.5}
+.mode-merge{border-color:#86efac;background:#f0fdf4}.mode-merge .mode-name{color:#166534}
+.mode-replace{border-color:#fca5a5;background:#fef2f2}.mode-replace .mode-name{color:#991b1b}
+.mode-skip{border-color:#93c5fd;background:#eff6ff}.mode-skip .mode-name{color:#1e40af}
+
+/* Order */
+.order{display:flex;align-items:center;gap:8px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:20px;flex-wrap:wrap}
+.order-box{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;text-align:center}
+.order-arrow{color:#999;font-size:16px}
+.ob-perm{background:#faf5ff;border:1px solid #d8b4fe;color:#6b21a8}
+.ob-scope{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
+.ob-role{background:#f0fdf4;border:1px solid #86efac;color:#166534}
+.ob-link{background:#fdf2f8;border:1px solid #f9a8d4;color:#9d174d}
+
+.steps{display:flex;flex-direction:column;gap:6px}
+.s{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border:1px solid #e5e5e5;border-radius:6px;font-size:13px}
+.s-n{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:#fff}
+.n-blue{background:#4a7fd4}.n-gray{background:#888}.n-green{background:#3a9a5c}.n-red{background:#c0392b}.n-orange{background:#d97706}
+.s-err{background:#fef2f2;border-color:#fca5a5}
+.s-ok{background:#f0fdf4;border-color:#86efac}
+
+.use-cases{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.uc{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border:1px solid #e5e5e5;border-radius:6px;font-size:13px}
+.uc-tag{padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;background:#eff6ff;color:#1e40af;white-space:nowrap;flex-shrink:0}
+
+.note{margin-top:24px;padding:14px 16px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#444;background:#f9fafb;line-height:1.7}
+.note b{color:#1a1a1a}
+.note-warn{background:#fef2f2;border-color:#fca5a5}
+.wm{text-align:center;margin-top:24px;font-size:11px;color:#bbb;font-family:'Source Code Pro',monospace}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>08 — Import API 流程</h1>
+  <div class="sub">POST /auth-service/v1/roles/actions/import · 批次匯入 Permission, Scope, Role</div>
+
+  <div class="section">三種模式</div>
+  <div class="modes">
+    <div class="mode mode-merge">
+      <div class="mode-name">merge</div>
+      <div class="mode-desc">新增不存在的<br>更新已存在的<br><b>最安全，推薦</b></div>
+    </div>
+    <div class="mode mode-replace">
+      <div class="mode-name">replace</div>
+      <div class="mode-desc">刪除該 namespace 下所有現有資料後重建<br><b>⚠️ 不影響 auth:*</b></div>
+    </div>
+    <div class="mode mode-skip">
+      <div class="mode-name">skip</div>
+      <div class="mode-desc">只新增不存在的<br>跳過已存在的<br><b>不覆蓋任何修改</b></div>
+    </div>
+  </div>
+
+  <div class="section">處理順序（Transaction 內一次完成）</div>
+  <div class="order">
+    <div class="order-box ob-perm">① Permission</div>
+    <div class="order-arrow">→</div>
+    <div class="order-box ob-scope">② Scope</div>
+    <div class="order-arrow">→</div>
+    <div class="order-box ob-role">③ Role</div>
+    <div class="order-arrow">→</div>
+    <div class="order-box ob-link">④ Role ↔ Permission 關聯</div>
+  </div>
+
+  <div class="section">完整流程</div>
+  <div class="steps">
+    <div class="s"><div class="s-n n-blue">1</div><div>驗證 JWT → 檢查 <code>auth:roles:manage</code></div></div>
+    <div class="s"><div class="s-n n-gray">2</div><div>驗證 request body：namespace 必填、mode 必填</div></div>
+    <div class="s s-err"><div class="s-n n-red">3</div><div><b>Namespace 保護</b>：若 namespace 為 "auth" 或 "system" → 403 拒絕（auth:* 只能由 Bootstrap 建立）</div></div>
+    <div class="s"><div class="s-n n-orange">4</div><div>若 mode = replace：先刪除指定 namespace 下所有 Permission、Scope、Role（CASCADE）</div></div>
+    <div class="s"><div class="s-n n-gray">5</div><div>建立/更新 Permission records</div></div>
+    <div class="s"><div class="s-n n-gray">6</div><div>建立/更新 Scope records</div></div>
+    <div class="s"><div class="s-n n-gray">7</div><div>建立/更新 Role records</div></div>
+    <div class="s"><div class="s-n n-gray">8</div><div>建立 Role ↔ Permission 關聯（Role 可引用 auth:* 的 permission）</div></div>
+    <div class="s s-ok"><div class="s-n n-green">9</div><div>回傳統計 <code>{imported: {roles:3, permissions:4, scopes:3}, skipped: {...}}</code></div></div>
+  </div>
+
+  <div class="section">典型使用場景</div>
+  <div class="use-cases">
+    <div class="uc"><div class="uc-tag">CI/CD</div><div>每次 SCC 部署時，自動呼叫 Import (merge) 確保定義與程式碼一致</div></div>
+    <div class="uc"><div class="uc-tag">首次部署</div><div>Bootstrap 建立 auth:* 後，管理者透過 Import 建立 scc-web:* 角色架構</div></div>
+    <div class="uc"><div class="uc-tag">版本升級</div><div>新版 SCC 新增功能 → Import (merge) 帶入新 Permission → 更新 Role 定義</div></div>
+  </div>
+
+  <div class="note note-warn">
+    <b>⚠️ replace 注意：</b>會刪除該 namespace 下所有現有 Permission、Scope、Role 再重建。已指派給帳號的 Role Assignment 如引用被刪 Role 會被 CASCADE 刪除。永不影響 auth:*。生產環境優先用 merge。
+  </div>
+  <div class="wm">Auth Service v3.2 · Import API Flow</div>
+</div>
+</body>
+</html>
