@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>5. API 權限檢查流程</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:0;font-size:14px}
+
+.page{max-width:1200px;margin:0 auto;padding:36px 40px 48px}
+.title{font-size:20px;font-weight:700;margin-bottom:4px;color:#1a1a1a}
+.title-line{height:3px;background:linear-gradient(90deg,#4a7fd4 0%,#4a7fd4 40%,#e5e5e5 40%);margin-bottom:28px;border-radius:2px}
+
+svg{display:block;margin:0 auto}
+svg text{font-family:'Noto Sans TC',sans-serif}
+
+.participant-box{fill:#f0f4fa;stroke:#b0c4de;stroke-width:1.5;rx:6}
+.participant-label{font-size:13px;font-weight:600;fill:#2c3e6b;text-anchor:middle;dominant-baseline:central}
+.lifeline{stroke:#d0d0d0;stroke-width:1;stroke-dasharray:6,4}
+.msg-label{font-size:12px;fill:#333}
+.msg-label-bold{font-size:12px;fill:#1a1a1a;font-weight:600}
+.msg-sub{font-size:10.5px;fill:#888}
+.msg-code{font-size:11.5px;fill:#c0392b;font-family:'Source Code Pro',monospace}
+.msg-error{font-size:11.5px;fill:#c0392b;font-weight:500}
+.msg-success{font-size:11.5px;fill:#1a7a3a;font-weight:500}
+.activation{fill:#e8eefc;stroke:#b0c4de;stroke-width:1;rx:2}
+.activation-db{fill:#f0e8fc;stroke:#c4b0de;stroke-width:1;rx:2}
+.frame{fill:none;stroke:#bbb;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-label-bg{fill:#f5f5f5;stroke:none}
+.frame-label{font-size:10px;fill:#888;font-weight:600;letter-spacing:0.5px}
+.phase-line{stroke:#ccc;stroke-width:1;stroke-dasharray:2,2}
+.phase-bg{fill:#f9fafb;stroke:none}
+.phase-label{font-size:10px;fill:#999;font-weight:600;text-anchor:middle;letter-spacing:1px}
+.note-box{fill:#fffde7;stroke:#e0d97e;stroke-width:1;rx:4}
+.note-text{font-size:10.5px;fill:#6b6320}
+.note-box-blue{fill:#eef4ff;stroke:#a8c4e8;stroke-width:1;rx:4}
+.note-text-blue{font-size:10.5px;fill:#2c5282}
+.footer{font-size:11px;fill:#bbb;text-anchor:middle;font-family:'Source Code Pro',monospace}
+
+.section-title{font-size:17px;font-weight:700;margin:36px 0 8px;color:#1a1a1a;border-bottom:2px solid #e5e5e5;padding-bottom:6px}
+.info{margin-top:20px;padding:14px 16px;border-left:3px solid #4a7fd4;background:#f8fafd;font-size:13px;color:#444;line-height:1.7}
+.info b{color:#1a1a1a}
+.info code{font-family:'Source Code Pro',monospace;font-size:12px;background:#eef2f7;padding:1px 5px;border-radius:3px;color:#c0392b}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">5. API 權限檢查流程</div>
+  <div class="title-line"></div>
+
+  <!-- ================================================================ -->
+  <!-- PART A: Full Decision Tree as Sequence Diagram                   -->
+  <!-- ================================================================ -->
+  <div class="section-title">A. 完整決策流程（每個 API 請求都經過）</div>
+
+  <svg width="1140" height="1100" viewBox="0 0 1140 1100">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555"/></marker>
+      <marker id="arrowhead-light" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+      <marker id="arrowhead-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/></marker>
+      <marker id="arrowhead-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c0392b"/></marker>
+    </defs>
+
+    <!-- ==================== PARTICIPANTS ==================== -->
+    <rect class="participant-box" x="30" y="10" width="120" height="40"/>
+    <text class="participant-label" x="90" y="30">前端 / Client</text>
+
+    <rect class="participant-box" x="280" y="10" width="140" height="40"/>
+    <text class="participant-label" x="350" y="30">JWT Filter</text>
+
+    <rect class="participant-box" x="560" y="10" width="160" height="40"/>
+    <text class="participant-label" x="640" y="30">Permission Guard</text>
+
+    <rect class="participant-box" x="870" y="10" width="130" height="40"/>
+    <text class="participant-label" x="935" y="30">Business Logic</text>
+
+    <!-- ==================== LIFELINES ==================== -->
+    <line class="lifeline" x1="90" y1="50" x2="90" y2="1010"/>
+    <line class="lifeline" x1="350" y1="50" x2="350" y2="1010"/>
+    <line class="lifeline" x1="640" y1="50" x2="640" y2="1010"/>
+    <line class="lifeline" x1="935" y1="50" x2="935" y2="1010"/>
+
+    <!-- ==================== ACTIVATION ==================== -->
+    <rect class="activation" x="343" y="85" width="14" height="405"/>
+    <rect class="activation" x="633" y="555" width="14" height="370"/>
+    <rect x="928" y="950" width="14" height="30" rx="2" fill="#e8f5e9" stroke="#66bb6a" stroke-width="1"/>
+
+    <!-- ================================================================ -->
+    <!-- STEP 1: Request comes in                                         -->
+    <!-- ================================================================ -->
+    <line x1="90" y1="90" x2="343" y2="90" stroke="#555" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text class="msg-code" x="120" y="83">GET /auth-service/v1/accounts/acc-001</text>
+    <text class="msg-sub" x="120" y="108">Authorization: Bearer eyJ...</text>
+
+    <!-- ================================================================ -->
+    <!-- STEP 2: Public API check                                         -->
+    <!-- ================================================================ -->
+    <rect class="frame" x="280" y="130" width="260" height="70"/>
+    <rect class="frame-label-bg" x="281" y="130" width="110" height="18"/>
+    <text class="frame-label" x="288" y="142">① Public API？</text>
+
+    <path d="M357,160 L435,160 L435,184 L357,184" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="365" y="155">檢查 URL 是否在白名單</text>
+    <text class="msg-sub" x="445" y="178">POST /tokens, GET /health...</text>
+
+    <!-- Note: public APIs -->
+    <rect class="note-box" x="30" y="140" width="210" height="44"/>
+    <text class="note-text" x="40" y="156">Public API 不需要 JWT</text>
+    <text class="note-text" x="40" y="171">直接放行到 Business Logic</text>
+
+    <!-- ================================================================ -->
+    <!-- STEP 3: Validate JWT signature + exp                             -->
+    <!-- ================================================================ -->
+    <rect class="frame" x="280" y="225" width="260" height="85"/>
+    <rect class="frame-label-bg" x="281" y="225" width="130" height="18"/>
+    <text class="frame-label" x="288" y="237">② 驗證 JWT</text>
+
+    <path d="M357,260 L445,260 L445,288 L357,288" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="365" y="255">驗證簽名是否有效</text>
+    <text class="msg-label" x="365" y="272">檢查 exp（Expiration Time）</text>
+    <text class="msg-error" x="455" y="286">無效 / 過期 → 401 Unauthorized</text>
+
+    <!-- 401 return -->
+    <line x1="343" y1="330" x2="97" y2="330" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="120" y="325">JWT 無效 → 401</text>
+
+    <!-- ================================================================ -->
+    <!-- STEP 4: Check Session exists + active                            -->
+    <!-- ================================================================ -->
+    <rect class="frame" x="280" y="360" width="260" height="95"/>
+    <rect class="frame-label-bg" x="281" y="360" width="145" height="18"/>
+    <text class="frame-label" x="288" y="372">③ 驗證 Session</text>
+
+    <path d="M357,398 L445,398 L445,430 L357,430" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="365" y="393">從 JWT.sessionId 查 DB</text>
+    <text class="msg-label" x="365" y="412">確認 Session status = active</text>
+    <text class="msg-error" x="455" y="427">不存在 / 非 active → 401</text>
+
+    <!-- 401 return -->
+    <line x1="343" y1="475" x2="97" y2="475" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="120" y="470">Session 無效 → 401（已登出）</text>
+
+    <!-- ================================================================ -->
+    <!-- Phase: JWT + Session verified → Permission check                 -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="510" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="520" x2="1110" y2="520"/>
+    <text class="phase-label" x="570" y="525">身份驗證通過 → 進入權限檢查</text>
+
+    <!-- Hand off to Permission Guard -->
+    <line x1="357" y1="560" x2="633" y2="560" stroke="#555" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="380" y="554">傳遞 JWT payload 給 Permission Guard</text>
+
+    <!-- ================================================================ -->
+    <!-- STEP 5: Self-action check                                        -->
+    <!-- ================================================================ -->
+    <rect class="frame" x="565" y="590" width="340" height="105"/>
+    <rect class="frame-label-bg" x="566" y="590" width="140" height="18"/>
+    <text class="frame-label" x="573" y="602">④ Self-action 檢查</text>
+
+    <path d="M647,625 L745,625 L745,655 L647,655" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="655" y="620">JWT.sub == URL 中的 accountId？</text>
+
+    <text class="msg-success" x="755" y="643" font-size="11">是 → Self-action</text>
+    <text class="msg-sub" x="755" y="658">檢查操作是否在 Self 允許範圍</text>
+    <text class="msg-sub" x="655" y="685">允許：讀取自己帳號、改密碼、管理自己 Session</text>
+
+    <!-- Note: Self-action -->
+    <rect class="note-box-blue" x="30" y="600" width="230" height="72"/>
+    <text class="note-text-blue" x="40" y="616">Self-action 設計目的：</text>
+    <text class="note-text-blue" x="40" y="631">讓一般使用者可以操作自己的</text>
+    <text class="note-text-blue" x="40" y="646">資料，不需要額外的 Permission</text>
+    <text class="note-text-blue" x="40" y="661">（例如改自己密碼、登出）</text>
+
+    <!-- ================================================================ -->
+    <!-- STEP 6: Permission code check                                    -->
+    <!-- ================================================================ -->
+    <rect class="frame" x="565" y="720" width="340" height="120"/>
+    <rect class="frame-label-bg" x="566" y="720" width="180" height="18"/>
+    <text class="frame-label" x="573" y="732">⑤ Permission Code 檢查</text>
+
+    <path d="M647,758 L755,758 L755,790 L647,790" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)"/>
+    <text class="msg-label" x="655" y="752">不是 Self → 檢查 Permission</text>
+
+    <text class="msg-sub" x="655" y="778">此 API 需要：</text>
+    <text class="msg-code" x="725" y="780">("auth:accounts:read")</text>
+
+    <text class="msg-sub" x="655" y="820">JWT.permissions 包含該 code？</text>
+    <text class="msg-error" x="765" y="835">不包含 → 403 Forbidden</text>
+
+    <!-- 403 return -->
+    <line x1="633" y1="865" x2="97" y2="865" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#arrowhead-red)"/>
+    <text class="msg-error" x="200" y="860">無權限 → 403 Forbidden</text>
+
+    <!-- ================================================================ -->
+    <!-- Phase: All checks passed                                         -->
+    <!-- ================================================================ -->
+    <rect class="phase-bg" x="30" y="900" width="1080" height="20"/>
+    <line class="phase-line" x1="30" y1="910" x2="1110" y2="910"/>
+    <text class="phase-label" x="570" y="915">所有檢查通過 → 執行業務邏輯</text>
+
+    <!-- Pass to business logic -->
+    <line x1="647" y1="950" x2="928" y2="950" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+    <text class="msg-success" x="700" y="944">放行 → 執行 API</text>
+
+    <!-- Return success -->
+    <line x1="928" y1="980" x2="97" y2="980" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#arrowhead-green)"/>
+    <text class="msg-success" x="400" y="975">200 OK — 回傳結果</text>
+
+    <!-- ==================== PARTICIPANTS (BOTTOM) ==================== -->
+    <rect class="participant-box" x="30" y="1010" width="120" height="40"/>
+    <text class="participant-label" x="90" y="1030">前端 / Client</text>
+    <rect class="participant-box" x="280" y="1010" width="140" height="40"/>
+    <text class="participant-label" x="350" y="1030">JWT Filter</text>
+    <rect class="participant-box" x="560" y="1010" width="160" height="40"/>
+    <text class="participant-label" x="640" y="1030">Permission Guard</text>
+    <rect class="participant-box" x="870" y="1010" width="130" height="40"/>
+    <text class="participant-label" x="935" y="1030">Business Logic</text>
+
+    <text class="footer" x="570" y="1085">Auth Service v3.2 · API Permission Check Decision Flow</text>
+  </svg>
+
+  <!-- ================================================================ -->
+  <!-- PART B: 4 Scenario Examples                                       -->
+  <!-- ================================================================ -->
+  <div class="section-title">B. 場景範例</div>
+
+  <svg width="1140" height="520" viewBox="0 0 1140 520">
+    <!-- ===== Scenario Table Header ===== -->
+    <rect x="30" y="10" width="40" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="50" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">#</text>
+    <rect x="70" y="10" width="160" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="150" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">使用者</text>
+    <rect x="230" y="10" width="300" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="380" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">請求</text>
+    <rect x="530" y="10" width="250" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="655" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">判斷過程</text>
+    <rect x="780" y="10" width="100" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="830" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">結果</text>
+    <rect x="880" y="10" width="230" height="36" rx="4" fill="#e8eefc" stroke="#b0c4de" stroke-width="1"/>
+    <text x="995" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2c3e6b">原因</text>
+
+    <!-- ===== Scenario 1: Self-action success ===== -->
+    <rect x="30" y="50" width="40" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="50" y="102" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">1</text>
+    <rect x="70" y="50" width="160" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="80" y="75" font-size="12" font-weight="600" fill="#333">Derek</text>
+    <text x="80" y="92" font-size="10" fill="#888">sub: acc-derek</text>
+    <text x="80" y="107" font-size="10" fill="#888">permissions:</text>
+    <text x="80" y="122" font-size="10" fill="#888">（無 auth:sessions:read）</text>
+    <text x="80" y="137" font-size="10" fill="#888">role: Operator</text>
+    <rect x="230" y="50" width="300" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="240" y="75" font-size="11" fill="#333" font-weight="500">GET</text>
+    <text x="240" y="93" font-size="10.5" fill="#c0392b" font-family="'Source Code Pro',monospace">/accounts/acc-derek/sessions</text>
+    <text x="240" y="112" font-size="10" fill="#888">Derek 查看自己的 Session 列表</text>
+    <rect x="530" y="50" width="250" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="540" y="72" font-size="10.5" fill="#333">① Public? → 否</text>
+    <text x="540" y="88" font-size="10.5" fill="#333">② JWT 有效? → 是</text>
+    <text x="540" y="104" font-size="10.5" fill="#333">③ Session active? → 是</text>
+    <text x="540" y="120" font-size="10.5" fill="#1a7a3a" font-weight="600">④ Self-action? → 是 ✓</text>
+    <text x="540" y="136" font-size="10" fill="#888">JWT.sub == acc-derek</text>
+    <rect x="780" y="50" width="100" height="95" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
+    <text x="830" y="102" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">✅ 200</text>
+    <rect x="880" y="50" width="230" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="890" y="75" font-size="10.5" fill="#333">操作自己的 Session</text>
+    <text x="890" y="93" font-size="10.5" fill="#333">屬於 Self-action 允許範圍</text>
+    <text x="890" y="113" font-size="10.5" fill="#1a7a3a">不需要 auth:sessions:read</text>
+
+    <!-- ===== Scenario 2: Not self, no permission ===== -->
+    <rect x="30" y="150" width="40" height="95" fill="#fef2f2" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="50" y="202" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">2</text>
+    <rect x="70" y="150" width="160" height="95" fill="#fef2f2" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="80" y="175" font-size="12" font-weight="600" fill="#333">Derek</text>
+    <text x="80" y="192" font-size="10" fill="#888">sub: acc-derek</text>
+    <text x="80" y="207" font-size="10" fill="#888">permissions:</text>
+    <text x="80" y="222" font-size="10" fill="#888">（無 auth:sessions:read）</text>
+    <text x="80" y="237" font-size="10" fill="#888">role: Operator</text>
+    <rect x="230" y="150" width="300" height="95" fill="#fef2f2" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="240" y="175" font-size="11" fill="#333" font-weight="500">GET</text>
+    <text x="240" y="193" font-size="10.5" fill="#c0392b" font-family="'Source Code Pro',monospace">/accounts/acc-alice/sessions</text>
+    <text x="240" y="212" font-size="10" fill="#888">Derek 想看 Alice 的 Session</text>
+    <rect x="530" y="150" width="250" height="95" fill="#fef2f2" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="540" y="172" font-size="10.5" fill="#333">① Public? → 否</text>
+    <text x="540" y="188" font-size="10.5" fill="#333">② JWT 有效? → 是</text>
+    <text x="540" y="204" font-size="10.5" fill="#333">③ Session active? → 是</text>
+    <text x="540" y="220" font-size="10.5" fill="#333">④ Self-action? → 否</text>
+    <text x="540" y="236" font-size="10.5" fill="#c0392b" font-weight="600">⑤ Permission? → 無 ✗</text>
+    <rect x="780" y="150" width="100" height="95" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
+    <text x="830" y="202" text-anchor="middle" font-size="14" font-weight="700" fill="#991b1b">❌ 403</text>
+    <rect x="880" y="150" width="230" height="95" fill="#fef2f2" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="890" y="175" font-size="10.5" fill="#333">acc-derek ≠ acc-alice</text>
+    <text x="890" y="193" font-size="10.5" fill="#333">不是 Self-action</text>
+    <text x="890" y="213" font-size="10.5" fill="#c0392b">缺少 auth:sessions:read</text>
+
+    <!-- ===== Scenario 3: Admin has permission ===== -->
+    <rect x="30" y="250" width="40" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="50" y="302" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">3</text>
+    <rect x="70" y="250" width="160" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="80" y="275" font-size="12" font-weight="600" fill="#333">Admin</text>
+    <text x="80" y="292" font-size="10" fill="#888">sub: acc-admin</text>
+    <text x="80" y="307" font-size="10" fill="#888">permissions:</text>
+    <text x="80" y="322" font-size="10" fill="#1a7a3a">[auth:sessions:read, ...]</text>
+    <text x="80" y="337" font-size="10" fill="#888">role: SuperAdmin</text>
+    <rect x="230" y="250" width="300" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="240" y="275" font-size="11" fill="#333" font-weight="500">GET</text>
+    <text x="240" y="293" font-size="10.5" fill="#c0392b" font-family="'Source Code Pro',monospace">/accounts/acc-alice/sessions</text>
+    <text x="240" y="312" font-size="10" fill="#888">Admin 查看 Alice 的 Session</text>
+    <rect x="530" y="250" width="250" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="540" y="272" font-size="10.5" fill="#333">① Public? → 否</text>
+    <text x="540" y="288" font-size="10.5" fill="#333">② JWT 有效? → 是</text>
+    <text x="540" y="304" font-size="10.5" fill="#333">③ Session active? → 是</text>
+    <text x="540" y="320" font-size="10.5" fill="#333">④ Self-action? → 否</text>
+    <text x="540" y="336" font-size="10.5" fill="#1a7a3a" font-weight="600">⑤ Permission? → 有 ✓</text>
+    <rect x="780" y="250" width="100" height="95" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
+    <text x="830" y="302" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">✅ 200</text>
+    <rect x="880" y="250" width="230" height="95" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="890" y="275" font-size="10.5" fill="#333">acc-admin ≠ acc-alice</text>
+    <text x="890" y="293" font-size="10.5" fill="#333">不是 Self → 檢查 Permission</text>
+    <text x="890" y="313" font-size="10.5" fill="#1a7a3a">有 auth:sessions:read ✓</text>
+
+    <!-- ===== Scenario 4: Self-action with limited fields ===== -->
+    <rect x="30" y="350" width="40" height="105" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="50" y="407" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">4</text>
+    <rect x="70" y="350" width="160" height="105" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="80" y="375" font-size="12" font-weight="600" fill="#333">Derek</text>
+    <text x="80" y="392" font-size="10" fill="#888">sub: acc-derek</text>
+    <text x="80" y="407" font-size="10" fill="#888">permissions:</text>
+    <text x="80" y="422" font-size="10" fill="#888">（無 auth:accounts:write）</text>
+    <text x="80" y="437" font-size="10" fill="#888">role: Operator</text>
+    <rect x="230" y="350" width="300" height="105" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="240" y="375" font-size="11" fill="#333" font-weight="500">PATCH</text>
+    <text x="240" y="393" font-size="10.5" fill="#c0392b" font-family="'Source Code Pro',monospace">/accounts/acc-derek</text>
+    <text x="240" y="412" font-size="10" fill="#888">Derek 改自己的 displayName</text>
+    <text x="240" y="432" font-size="10" fill="#333">{displayName: "Derek Tsai"}</text>
+    <rect x="530" y="350" width="250" height="105" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="540" y="372" font-size="10.5" fill="#333">① Public? → 否</text>
+    <text x="540" y="388" font-size="10.5" fill="#333">② JWT 有效? → 是</text>
+    <text x="540" y="404" font-size="10.5" fill="#333">③ Session active? → 是</text>
+    <text x="540" y="420" font-size="10.5" fill="#1a7a3a" font-weight="600">④ Self-action? → 是 ✓</text>
+    <text x="540" y="436" font-size="10" fill="#888">displayName 是 Self 允許欄位</text>
+    <text x="540" y="450" font-size="10" fill="#888">（status, roleId 等不允許）</text>
+    <rect x="780" y="350" width="100" height="105" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
+    <text x="830" y="407" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">✅ 200</text>
+    <rect x="880" y="350" width="230" height="105" fill="#f0fdf4" stroke="#e5e5e5" stroke-width="0.5"/>
+    <text x="890" y="375" font-size="10.5" fill="#333">Self-action 允許修改：</text>
+    <text x="890" y="393" font-size="10.5" fill="#1a7a3a">✓ displayName, email</text>
+    <text x="890" y="413" font-size="10.5" fill="#c0392b">✗ status, roleId, username</text>
+    <text x="890" y="433" font-size="10" fill="#888">（需 auth:accounts:write）</text>
+
+    <!-- Summary box -->
+    <rect x="30" y="470" width="1080" height="40" rx="6" fill="#f0f4fa" stroke="#b0c4de" stroke-width="1"/>
+    <text x="570" y="486" text-anchor="middle" font-size="12" font-weight="600" fill="#2c3e6b">決策優先序：① Public → ② JWT 簽名 → ③ Session 存在 → ④ Self-action → ⑤ Permission Code</text>
+    <text x="570" y="502" text-anchor="middle" font-size="11" fill="#666">任一步驟失敗即回傳錯誤（401 / 403），不繼續後續步驟</text>
+  </svg>
+
+  <div class="info">
+    <b>兩層架構：</b>JWT Filter（①②③ 身份驗證）→ Permission Guard（④⑤ 權限檢查）→ Business Logic<br>
+    <b>Self-action：</b>當 <code>JWT.sub == URL.accountId</code> 時，允許操作自己的有限資料（displayName、email、password、sessions），不需要額外 Permission。<br>
+    <b>Permission Code：</b>非 Self 操作時，檢查 <code>JWT.permissions</code> 是否包含該 API 標註的 <code>@RequirePermission</code> code。
+  </div>
+</div>
+</body>
+</html>
