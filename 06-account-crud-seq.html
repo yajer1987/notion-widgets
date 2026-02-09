@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>6. 帳號 CRUD 流程</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans TC',sans-serif;background:#fff;color:#1a1a1a;padding:0;font-size:14px}
+
+.page{max-width:1200px;margin:0 auto;padding:36px 40px 48px}
+.title{font-size:20px;font-weight:700;margin-bottom:4px;color:#1a1a1a}
+.title-line{height:3px;background:linear-gradient(90deg,#4a7fd4 0%,#4a7fd4 40%,#e5e5e5 40%);margin-bottom:28px;border-radius:2px}
+
+svg{display:block;margin:0 auto}
+svg text{font-family:'Noto Sans TC',sans-serif}
+
+.participant-box{fill:#f0f4fa;stroke:#b0c4de;stroke-width:1.5;rx:6}
+.participant-label{font-size:13px;font-weight:600;fill:#2c3e6b;text-anchor:middle;dominant-baseline:central}
+.lifeline{stroke:#d0d0d0;stroke-width:1;stroke-dasharray:6,4}
+.msg-label{font-size:12px;fill:#333}
+.msg-label-bold{font-size:12px;fill:#1a1a1a;font-weight:600}
+.msg-sub{font-size:10.5px;fill:#888}
+.msg-code{font-size:11.5px;fill:#c0392b;font-family:'Source Code Pro',monospace}
+.msg-error{font-size:11.5px;fill:#c0392b;font-weight:500}
+.msg-success{font-size:11.5px;fill:#1a7a3a;font-weight:500}
+.activation{fill:#e8eefc;stroke:#b0c4de;stroke-width:1;rx:2}
+.activation-db{fill:#f0e8fc;stroke:#c4b0de;stroke-width:1;rx:2}
+.frame{fill:none;stroke:#bbb;stroke-width:1;stroke-dasharray:4,3;rx:4}
+.frame-label-bg{fill:#f5f5f5;stroke:none}
+.frame-label{font-size:10px;fill:#888;font-weight:600;letter-spacing:0.5px}
+.phase-line{stroke:#ccc;stroke-width:1;stroke-dasharray:2,2}
+.phase-bg{fill:#f9fafb;stroke:none}
+.phase-label{font-size:10px;fill:#999;font-weight:600;text-anchor:middle;letter-spacing:1px}
+.note-box{fill:#fffde7;stroke:#e0d97e;stroke-width:1;rx:4}
+.note-text{font-size:10.5px;fill:#6b6320}
+.note-box-blue{fill:#eef4ff;stroke:#a8c4e8;stroke-width:1;rx:4}
+.note-text-blue{font-size:10.5px;fill:#2c5282}
+.note-box-red{fill:#fef2f2;stroke:#fca5a5;stroke-width:1;rx:4}
+.note-text-red{font-size:10.5px;fill:#991b1b}
+.footer{font-size:11px;fill:#bbb;text-anchor:middle;font-family:'Source Code Pro',monospace}
+
+.section-title{font-size:17px;font-weight:700;margin:36px 0 8px;color:#1a1a1a;border-bottom:2px solid #e5e5e5;padding-bottom:6px}
+.info{margin-top:20px;padding:14px 16px;border-left:3px solid #4a7fd4;background:#f8fafd;font-size:13px;color:#444;line-height:1.7}
+.info b{color:#1a1a1a}
+.info code{font-family:'Source Code Pro',monospace;font-size:12px;background:#eef2f7;padding:1px 5px;border-radius:3px;color:#c0392b}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">6. 帳號 CRUD 流程</div>
+  <div class="title-line"></div>
+
+  <!-- ================================================================ -->
+  <!-- PART A: Create Account                                           -->
+  <!-- ================================================================ -->
+  <div class="section-title">A. 建立帳號 — POST /accounts</div>
+
+  <svg width="1100" height="700" viewBox="0 0 1100 700">
+    <defs>
+      <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555"/></marker>
+      <marker id="ah-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/></marker>
+      <marker id="ah-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c0392b"/></marker>
+      <marker id="ah-l" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+    </defs>
+
+    <!-- Participants -->
+    <rect class="participant-box" x="30" y="10" width="130" height="40"/>
+    <text class="participant-label" x="95" y="30">管理者 (Admin)</text>
+    <rect class="participant-box" x="310" y="10" width="130" height="40"/>
+    <text class="participant-label" x="375" y="30">Auth Service</text>
+    <rect class="participant-box" x="630" y="10" width="100" height="40"/>
+    <text class="participant-label" x="680" y="30">資料庫</text>
+
+    <!-- Lifelines -->
+    <line class="lifeline" x1="95" y1="50" x2="95" y2="640"/>
+    <line class="lifeline" x1="375" y1="50" x2="375" y2="640"/>
+    <line class="lifeline" x1="680" y1="50" x2="680" y2="640"/>
+
+    <!-- Activation -->
+    <rect class="activation" x="368" y="80" width="14" height="520"/>
+
+    <!-- ① Request -->
+    <line x1="95" y1="90" x2="368" y2="90" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <text class="msg-code" x="130" y="82">POST /accounts</text>
+    <text class="msg-sub" x="130" y="106">{username, password, displayName, passwordChangeRequired, roleAssignments}</text>
+
+    <!-- ② Permission check -->
+    <rect class="frame" x="300" y="128" width="280" height="50"/>
+    <rect class="frame-label-bg" x="301" y="128" width="150" height="18"/>
+    <text class="frame-label" x="308" y="140">① 權限檢查</text>
+    <text class="msg-label" x="320" y="163">需要 auth:accounts:write</text>
+
+    <!-- ③ Validate username unique -->
+    <line x1="382" y1="210" x2="673" y2="210" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <text class="msg-label" x="410" y="204">② 查詢 username 是否已存在</text>
+    <rect class="activation-db" x="673" y="205" width="14" height="30"/>
+    <line x1="673" y1="235" x2="382" y2="235" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah-l)"/>
+
+    <!-- Error: username conflict -->
+    <line x1="368" y1="268" x2="102" y2="268" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#ah-r)"/>
+    <text class="msg-error" x="120" y="263">已存在 → 409 Conflict</text>
+
+    <!-- ④ Validate password policy -->
+    <path d="M382,310 L460,310 L460,340 L382,340" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+    <text class="msg-label" x="390" y="305">③ 驗證密碼符合 passwordPolicy</text>
+    <text class="msg-sub" x="470" y="330">長度、大小寫、特殊字元…</text>
+
+    <!-- ⑤ bcrypt + save -->
+    <line x1="382" y1="380" x2="673" y2="380" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <text class="msg-label" x="410" y="374">④ bcrypt hash 密碼 → 建立 Account record</text>
+    <text class="msg-sub" x="410" y="394">status: "active", locked: false</text>
+    <rect class="activation-db" x="673" y="375" width="14" height="30"/>
+    <line x1="673" y1="405" x2="382" y2="405" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah-l)"/>
+
+    <!-- ⑥ Validate roleId + scopeId -->
+    <line x1="382" y1="445" x2="673" y2="445" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <text class="msg-label" x="410" y="439">⑤ 驗證 roleId / scopeId 存在 → 建立 RoleAssignment</text>
+    <rect class="activation-db" x="673" y="440" width="14" height="30"/>
+    <line x1="673" y1="470" x2="382" y2="470" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah-l)"/>
+
+    <!-- Note: roleId/scopeId -->
+    <rect class="note-box" x="780" y="430" width="230" height="58"/>
+    <text class="note-text" x="790" y="446">roleId 或 scopeId 不存在：</text>
+    <text class="note-text" x="790" y="461">→ 400 Bad Request</text>
+    <text class="note-text" x="790" y="476">帳號已建立但無 Assignment</text>
+
+    <!-- ⑦ Return 201 -->
+    <line x1="368" y1="530" x2="102" y2="530" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+    <text class="msg-success" x="120" y="524">⑥ 201 Created</text>
+    <text class="msg-sub" x="120" y="546">回傳完整 Account 物件（含 roleAssignments）</text>
+
+    <!-- Note: passwordChangeRequired -->
+    <rect class="note-box-blue" x="780" y="510" width="260" height="72"/>
+    <text class="note-text-blue" x="790" y="526">passwordChangeRequired: true 時</text>
+    <text class="note-text-blue" x="790" y="541">使用者首次登入可正常取得 JWT，</text>
+    <text class="note-text-blue" x="790" y="556">但回應帶 flag → 前端導向改密碼頁</text>
+    <text class="note-text-blue" x="790" y="571">改完後 flag 設為 false</text>
+
+    <!-- Bottom participants -->
+    <rect class="participant-box" x="30" y="640" width="130" height="40"/>
+    <text class="participant-label" x="95" y="660">管理者 (Admin)</text>
+    <rect class="participant-box" x="310" y="640" width="130" height="40"/>
+    <text class="participant-label" x="375" y="660">Auth Service</text>
+    <rect class="participant-box" x="630" y="640" width="100" height="40"/>
+    <text class="participant-label" x="680" y="660">資料庫</text>
+  </svg>
+
+  <!-- ================================================================ -->
+  <!-- PART B: Update Account (Self vs Admin)                           -->
+  <!-- ================================================================ -->
+  <div class="section-title">B. 更新帳號 — PATCH /accounts/{accountId}</div>
+
+  <svg width="1100" height="600" viewBox="0 0 1100 600">
+    <defs>
+      <marker id="ah2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555"/></marker>
+      <marker id="ah2-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/></marker>
+      <marker id="ah2-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c0392b"/></marker>
+      <marker id="ah2-l" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+    </defs>
+
+    <!-- Participants -->
+    <rect class="participant-box" x="30" y="10" width="120" height="40"/>
+    <text class="participant-label" x="90" y="30">前端 / Client</text>
+    <rect class="participant-box" x="310" y="10" width="130" height="40"/>
+    <text class="participant-label" x="375" y="30">Auth Service</text>
+    <rect class="participant-box" x="630" y="10" width="100" height="40"/>
+    <text class="participant-label" x="680" y="30">資料庫</text>
+
+    <!-- Lifelines -->
+    <line class="lifeline" x1="90" y1="50" x2="90" y2="540"/>
+    <line class="lifeline" x1="375" y1="50" x2="375" y2="540"/>
+    <line class="lifeline" x1="680" y1="50" x2="680" y2="540"/>
+
+    <!-- Activation -->
+    <rect class="activation" x="368" y="80" width="14" height="415"/>
+
+    <!-- ① Request -->
+    <line x1="90" y1="90" x2="368" y2="90" stroke="#555" stroke-width="1.5" marker-end="url(#ah2)"/>
+    <text class="msg-code" x="115" y="82">PATCH /accounts/{accountId}</text>
+    <text class="msg-sub" x="115" y="106">{displayName, email, status, roleAssignments, ...}</text>
+
+    <!-- ② Self-action check -->
+    <rect class="frame" x="300" y="130" width="310" height="95"/>
+    <rect class="frame-label-bg" x="301" y="130" width="170" height="18"/>
+    <text class="frame-label" x="308" y="142">① 身份驗證 + 權限判斷</text>
+
+    <path d="M382,162 L470,162 L470,190 L382,190" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text class="msg-label" x="390" y="157">JWT.sub == accountId？</text>
+    <text class="msg-sub" x="400" y="180">是 → Self（限部分欄位）</text>
+    <text class="msg-sub" x="400" y="206">否 → 需要 auth:accounts:write</text>
+
+    <!-- Self-action field table (right side note) -->
+    <rect class="note-box" x="770" y="75" width="290" height="120"/>
+    <text class="note-text" x="780" y="93" style="font-weight:600">Self 可操作欄位：</text>
+    <text class="note-text" x="780" y="111" style="fill:#1a7a3a">✓ displayName, email</text>
+    <text class="note-text" x="780" y="128" style="fill:#1a7a3a">✓ language, timezone</text>
+    <text class="note-text" x="780" y="150" style="font-weight:600">需 auth:accounts:write：</text>
+    <text class="note-text" x="780" y="168" style="fill:#c0392b">✗ status, roleAssignments</text>
+    <text class="note-text" x="780" y="185" style="fill:#c0392b">✗ accountType, passwordChangeRequired</text>
+
+    <!-- ③ Field filter -->
+    <path d="M382,265 L475,265 L475,295 L382,295" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text class="msg-label" x="390" y="260">② Self 時過濾受限欄位</text>
+    <text class="msg-sub" x="390" y="285">嘗試改 status / roleAssignments → 忽略或 403</text>
+
+    <!-- ④ Update DB -->
+    <line x1="382" y1="340" x2="673" y2="340" stroke="#555" stroke-width="1.5" marker-end="url(#ah2)"/>
+    <text class="msg-label" x="410" y="334">③ 更新 Account record</text>
+    <rect class="activation-db" x="673" y="335" width="14" height="30"/>
+    <line x1="673" y1="365" x2="382" y2="365" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah2-l)"/>
+
+    <!-- ⑤ Update roleAssignments if admin -->
+    <line x1="382" y1="405" x2="673" y2="405" stroke="#555" stroke-width="1.5" marker-end="url(#ah2)"/>
+    <text class="msg-label" x="410" y="399">④ 若為 Admin：更新 Role Assignments</text>
+    <text class="msg-sub" x="410" y="418">diff 舊 vs 新 → 刪除移除的、新增加的</text>
+    <rect class="activation-db" x="673" y="400" width="14" height="30"/>
+    <line x1="673" y1="430" x2="382" y2="430" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah2-l)"/>
+
+    <!-- Note: roleAssignment 生效時機 -->
+    <rect class="note-box-blue" x="770" y="385" width="270" height="58"/>
+    <text class="note-text-blue" x="780" y="401">Role 變更何時生效？</text>
+    <text class="note-text-blue" x="780" y="416">→ 下次 Token Refresh 時重新查詢</text>
+    <text class="note-text-blue" x="780" y="431">→ 新 JWT 包含最新 permissions</text>
+
+    <!-- ⑥ Return 200 -->
+    <line x1="368" y1="480" x2="97" y2="480" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#ah2-g)"/>
+    <text class="msg-success" x="120" y="474">⑤ 200 OK — 回傳更新後的 Account</text>
+
+    <!-- Bottom participants -->
+    <rect class="participant-box" x="30" y="540" width="120" height="40"/>
+    <text class="participant-label" x="90" y="560">前端 / Client</text>
+    <rect class="participant-box" x="310" y="540" width="130" height="40"/>
+    <text class="participant-label" x="375" y="560">Auth Service</text>
+    <rect class="participant-box" x="630" y="540" width="100" height="40"/>
+    <text class="participant-label" x="680" y="560">資料庫</text>
+  </svg>
+
+  <!-- ================================================================ -->
+  <!-- PART C: Delete Account                                           -->
+  <!-- ================================================================ -->
+  <div class="section-title">C. 刪除帳號 — DELETE /accounts/{accountId}</div>
+
+  <svg width="1100" height="610" viewBox="0 0 1100 610">
+    <defs>
+      <marker id="ah3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555"/></marker>
+      <marker id="ah3-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1a7a3a"/></marker>
+      <marker id="ah3-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c0392b"/></marker>
+      <marker id="ah3-l" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+    </defs>
+
+    <!-- Participants -->
+    <rect class="participant-box" x="30" y="10" width="130" height="40"/>
+    <text class="participant-label" x="95" y="30">管理者 (Admin)</text>
+    <rect class="participant-box" x="310" y="10" width="130" height="40"/>
+    <text class="participant-label" x="375" y="30">Auth Service</text>
+    <rect class="participant-box" x="630" y="10" width="100" height="40"/>
+    <text class="participant-label" x="680" y="30">資料庫</text>
+
+    <!-- Lifelines -->
+    <line class="lifeline" x1="95" y1="50" x2="95" y2="550"/>
+    <line class="lifeline" x1="375" y1="50" x2="375" y2="550"/>
+    <line class="lifeline" x1="680" y1="50" x2="680" y2="550"/>
+
+    <!-- Activation -->
+    <rect class="activation" x="368" y="80" width="14" height="420"/>
+
+    <!-- ① Request -->
+    <line x1="95" y1="90" x2="368" y2="90" stroke="#555" stroke-width="1.5" marker-end="url(#ah3)"/>
+    <text class="msg-code" x="130" y="82">DELETE /accounts/{accountId}</text>
+    <text class="msg-sub" x="130" y="106">需要 auth:accounts:write</text>
+
+    <!-- ② Self-delete prevention -->
+    <rect class="frame" x="300" y="130" width="300" height="60"/>
+    <rect class="frame-label-bg" x="301" y="130" width="130" height="18"/>
+    <text class="frame-label" x="308" y="142">① 防止自我刪除</text>
+    <text class="msg-label" x="320" y="170">JWT.sub ≠ accountId（不能刪除自己）</text>
+
+    <!-- Error: self-delete -->
+    <line x1="368" y1="220" x2="102" y2="220" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="6,4" marker-end="url(#ah3-r)"/>
+    <text class="msg-error" x="120" y="215">JWT.sub == accountId → 400 不可刪除自己</text>
+
+    <!-- Note: why prevent self-delete -->
+    <rect class="note-box-red" x="770" y="130" width="260" height="58"/>
+    <text class="note-text-red" x="780" y="148">為什麼不能刪除自己？</text>
+    <text class="note-text-red" x="780" y="163">防止最後一個管理者誤刪自己</text>
+    <text class="note-text-red" x="780" y="178">導致系統再也無法管理</text>
+
+    <!-- ③ Delete all sessions -->
+    <line x1="382" y1="270" x2="673" y2="270" stroke="#555" stroke-width="1.5" marker-end="url(#ah3)"/>
+    <text class="msg-label" x="410" y="264">② 刪除該帳號所有 Session</text>
+    <text class="msg-sub" x="410" y="284">立即強制所有裝置登出</text>
+    <rect class="activation-db" x="673" y="265" width="14" height="30"/>
+    <line x1="673" y1="295" x2="382" y2="295" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah3-l)"/>
+
+    <!-- ④ Delete all role assignments -->
+    <line x1="382" y1="335" x2="673" y2="335" stroke="#555" stroke-width="1.5" marker-end="url(#ah3)"/>
+    <text class="msg-label" x="410" y="329">③ 刪除所有 Role Assignment records</text>
+    <rect class="activation-db" x="673" y="330" width="14" height="30"/>
+    <line x1="673" y1="360" x2="382" y2="360" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah3-l)"/>
+
+    <!-- ⑤ Delete account record -->
+    <line x1="382" y1="400" x2="673" y2="400" stroke="#555" stroke-width="1.5" marker-end="url(#ah3)"/>
+    <text class="msg-label" x="410" y="394">④ 刪除 Account record</text>
+    <rect class="activation-db" x="673" y="395" width="14" height="30"/>
+    <line x1="673" y1="425" x2="382" y2="425" stroke="#888" stroke-width="1" stroke-dasharray="6,4" marker-end="url(#ah3-l)"/>
+
+    <!-- ⑥ Return 204 -->
+    <line x1="368" y1="475" x2="102" y2="475" stroke="#1a7a3a" stroke-width="1.5" marker-end="url(#ah3-g)"/>
+    <text class="msg-success" x="120" y="469">⑤ 204 No Content — 不可復原</text>
+
+    <!-- Bottom participants -->
+    <rect class="participant-box" x="30" y="550" width="130" height="40"/>
+    <text class="participant-label" x="95" y="570">管理者 (Admin)</text>
+    <rect class="participant-box" x="310" y="550" width="130" height="40"/>
+    <text class="participant-label" x="375" y="570">Auth Service</text>
+    <rect class="participant-box" x="630" y="550" width="100" height="40"/>
+    <text class="participant-label" x="680" y="570">資料庫</text>
+
+    <text class="footer" x="550" y="605">Auth Service v3.2 · Account Delete Flow</text>
+  </svg>
+
+  <!-- ================================================================ -->
+  <!-- PART D: Disable vs Delete comparison                             -->
+  <!-- ================================================================ -->
+  <div class="section-title">D. 停用 vs 刪除 比較</div>
+
+  <svg width="1100" height="240" viewBox="0 0 1100 240">
+    <!-- Disable box -->
+    <rect x="30" y="10" width="500" height="180" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+    <text x="50" y="38" font-size="15" font-weight="700" fill="#166534">停用 (Disable)</text>
+    <text x="50" y="58" font-size="11" fill="#888" font-family="'Source Code Pro',monospace">PATCH /accounts/{id}  {status: "disabled"}</text>
+
+    <text x="50" y="88" font-size="12.5" fill="#333">• 帳號資料保留在 DB，可隨時改回 "active" 恢復</text>
+    <text x="50" y="110" font-size="12.5" fill="#333">• 下次登入時收到 403 Account is disabled</text>
+    <text x="50" y="132" font-size="12.5" fill="#c0392b">• 已存在的 Session 仍有效（直到 JWT 過期）</text>
+    <text x="50" y="154" font-size="12.5" fill="#333">• 若需立即阻斷，額外呼叫：</text>
+    <text x="60" y="174" font-size="11" fill="#c0392b" font-family="'Source Code Pro',monospace">DELETE /accounts/{id}/sessions（強制全裝置登出）</text>
+
+    <!-- Delete box -->
+    <rect x="560" y="10" width="500" height="180" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+    <text x="580" y="38" font-size="15" font-weight="700" fill="#991b1b">刪除 (Delete)</text>
+    <text x="580" y="58" font-size="11" fill="#888" font-family="'Source Code Pro',monospace">DELETE /accounts/{id}</text>
+
+    <text x="580" y="88" font-size="12.5" fill="#333">• 帳號從 DB 永久移除，不可復原</text>
+    <text x="580" y="110" font-size="12.5" fill="#333">• 所有 Session 立即刪除（強制登出）</text>
+    <text x="580" y="132" font-size="12.5" fill="#333">• 所有 Role Assignment 一併移除</text>
+    <text x="580" y="154" font-size="12.5" fill="#333">• 不能刪除自己（防止管理者誤操作）</text>
+
+    <!-- Recommendation -->
+    <rect x="30" y="200" width="1030" height="30" rx="6" fill="#fffde7" stroke="#e0d97e" stroke-width="1"/>
+    <text x="545" y="220" text-anchor="middle" font-size="12" font-weight="600" fill="#6b6320">💡 建議：先停用 → 確認無影響 → 再刪除。OME / OneView 均建議先 disable 再 delete。</text>
+  </svg>
+
+  <div class="info">
+    <b>刪除順序很重要：</b>Session → Role Assignment → Account。必須先刪 Session（強制登出），否則已登入的 JWT 在過期前仍能通過權限檢查。<br>
+    <b>Self-action 限制：</b>PATCH 時 Self 只能改 <code>displayName</code>、<code>email</code>、<code>language</code>、<code>timezone</code>；改 <code>status</code>、<code>roleAssignments</code> 需要 <code>auth:accounts:write</code>。
+  </div>
+</div>
+</body>
+</html>
